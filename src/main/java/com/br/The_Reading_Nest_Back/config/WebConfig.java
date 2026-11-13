@@ -1,5 +1,6 @@
 package com.br.The_Reading_Nest_Back.config;
 
+import com.br.The_Reading_Nest_Back.entities.PerfilUsuario;
 import com.br.The_Reading_Nest_Back.entities.StatusAluguel;
 import com.br.The_Reading_Nest_Back.entities.StatusConta;
 import com.br.The_Reading_Nest_Back.entities.StatusLivro;
@@ -17,11 +18,11 @@ import java.util.List;
  * Explicação simples:
  * Ajusta as configurações gerais de navegação da biblioteca: garante que qualquer busca retorne
  * por padrão 30 itens por página (com limite máximo de 100) e ensina o sistema a entender filtros
- * tanto em maiúsculas quanto em minúsculas (por exemplo, aceitando tanto 'ativo' quanto 'ATIVO').
+ * e valores tanto em maiúsculas quanto em minúsculas (por exemplo, aceitando tanto 'admin' quanto 'ADMIN').
  *
  * Explicação técnica:
  * Configuração MVC que customiza os resolvedores de argumentos e formatadores do Spring MVC.
- * Adiciona conversores case-insensitive para os enumeradores de domínio (StatusLivro, StatusConta e StatusAluguel),
+ * Adiciona conversores case-insensitive para os enumeradores de domínio (StatusLivro, StatusConta, StatusAluguel e PerfilUsuario),
  * normalizando a entrada com trim().toLowerCase() antes de chamar o valueOf(), e registra o
  * PageableHandlerMethodArgumentResolver com página padrão de 30 itens e teto máximo de 100 itens.
  */
@@ -60,6 +61,17 @@ public class WebConfig implements WebMvcConfigurer {
                     return null;
                 }
                 return StatusAluguel.valueOf(source.trim().toLowerCase());
+            }
+        });
+
+        // Conversor case-insensitive para PerfilUsuario
+        registry.addConverter(new Converter<String, PerfilUsuario>() {
+            @Override
+            public PerfilUsuario convert(String source) {
+                if (source == null || source.isBlank()) {
+                    return null;
+                }
+                return PerfilUsuario.valueOf(source.trim().toLowerCase());
             }
         });
     }

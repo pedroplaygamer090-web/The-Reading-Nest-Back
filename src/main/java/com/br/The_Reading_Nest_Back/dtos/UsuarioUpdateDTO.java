@@ -1,5 +1,6 @@
 package com.br.The_Reading_Nest_Back.dtos;
 
+import com.br.The_Reading_Nest_Back.entities.PerfilUsuario;
 import com.br.The_Reading_Nest_Back.entities.StatusConta;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -8,16 +9,18 @@ import jakarta.validation.constraints.Size;
 /**
  * Explicação simples:
  * Formulário utilizado para atualizar dados cadastrais de um usuário. Permite alterar o nome,
- * e-mail, status da conta e, opcionalmente, redefinir a senha de acesso (se enviada).
+ * e-mail, perfil de acesso, status da conta e, opcionalmente, redefinir a senha de acesso (se enviada).
  *
  * Explicação técnica:
  * DTO de entrada para operações de atualização parcial ou total via PUT /usuarios/{id}.
  * A validação @Size(min = 6) na senha só é acionada caso o campo não seja nulo, permitindo
  * atualizar outros dados do usuário sem a obrigatoriedade de reescrever ou reenviar a senha atual.
+ * Modificações no campo 'perfil' são restritas estritamente a administradores autenticados.
  *
  * @param nome Novo nome completo do usuário.
  * @param email Novo endereço de e-mail do usuário.
  * @param senha Nova senha opcional (se preenchida, deve possuir no mínimo 6 caracteres).
+ * @param perfil Perfil de acesso ('admin' ou 'cliente'). Opcional.
  * @param statusConta Situação da conta do usuário ('ativo', 'suspenso' ou 'desativado').
  */
 public record UsuarioUpdateDTO(
@@ -32,6 +35,8 @@ public record UsuarioUpdateDTO(
 
         @Size(min = 6, message = "A SENHA DEVE TER NO MÍNIMO 6 CARACTERES")
         String senha,
+
+        PerfilUsuario perfil,
 
         StatusConta statusConta
 ) {

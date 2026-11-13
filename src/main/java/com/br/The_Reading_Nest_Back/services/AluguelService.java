@@ -7,6 +7,7 @@ import com.br.The_Reading_Nest_Back.mappers.AluguelMapper;
 import com.br.The_Reading_Nest_Back.repositories.AluguelRepository;
 import com.br.The_Reading_Nest_Back.repositories.LivroRepository;
 import com.br.The_Reading_Nest_Back.repositories.UsuarioRepository;
+import com.br.The_Reading_Nest_Back.security.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -24,15 +25,15 @@ import java.util.UUID;
 /**
  * Explicação simples:
  * O cérebro das operações de aluguel e empréstimo de livros. Ele confere se o leitor está com a conta ativa,
- * se há livros suficientes na estante antes de permitir a retirada, diminui o estoque no momento do empréstimo
- * e devolve os livros para a estante física quando o aluguel é concluído ou cancelado.
+ * se há exemplares suficientes na estante antes de permitir a retirada, diminui o estoque na hora,
+ * devolve os livros ao acervo quando o aluguel é concluído ou cancelado e garante que cada leitor
+ * só mexa nos seus próprios empréstimos.
  *
  * Explicação técnica:
- * Camada de serviço responsável pelo fluxo de ciclo de vida de aluguéis.
- * Assegura atomicidade com anotações @Transactional (rollback automático caso qualquer validação
- * ou decremento falhe), executa controle de concorrência com decremento atômico condicional no MySQL
- * (evitando que o estoque fique negativo), valida integridade cadastral e gerencia o incremento de volta
- * ao acervo físico em devoluções e cancelamentos.
+ * Camada de serviço de ciclo de vida de aluguéis com transações atômicas (@Transactional).
+ * Implementa controle de concorrência com decremento condicional no MySQL (evitando estoque negativo),
+ * valida a propriedade do recurso (owner checking) através do SecurityUtils para clientes comuns,
+ * e restitui o estoque atômico de livros em operações de devolução e cancelamento.
  */
 @Service
 public class AluguelService {
@@ -43,27 +44,37 @@ public class AluguelService {
     private final LivroRepository livroRepository;
     private final UsuarioRepository usuarioRepository;
     private final AluguelMapper aluguelMapper;
+    private final SecurityUtils securityUtils;
 
     public AluguelService(
             AluguelRepository aluguelRepository,
             LivroRepository livroRepository,
             UsuarioRepository usuarioRepository,
-            AluguelMapper aluguelMapper
+            AluguelMapper aluguelMapper,
+            SecurityUtils securityUtils
     ) {
         this.aluguelRepository = aluguelRepository;
         this.livroRepository = livroRepository;
         this.usuarioRepository = usuarioRepository;
         this.aluguelMapper = aluguelMapper;
+        this.securityUtils = securityUtils;
     }
 
     /**
-     * Cria um novo aluguel de forma atômica, validando leitor, livros e decrementando o estoque físico.
+     * Cria um novo aluguel de forma atômica, validando permissão de dono, leitor, livros e decrementando o estoque físico.
      *
      * @param dto Dados do empréstimo contendo usuário, data de entrega e lista de IDs dos livros.
      * @return DTO com a visão detalhada do aluguel recém-criado e seus livros vinculados.
      */
     @Transactional
     public AluguelDetalhadoResponseDTO criarAluguel(AluguelRequestDTO dto) {
+        // Validação de posse: cliente só pode alugar em seu próprio nome
+        securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
+            if (usuarioLogado.perfil() == PerfilUsuario.cliente && !usuarioLogado.id().equals(dto.usuarioId())) {
+                throw new CustomException(HttpStatus.FORBIDDEN, "ACESSO NEGADO: VOCÊ SÓ PODE ACESSAR SEUS PRÓPRIOS DADOS");
+            }
+        });
+
         // 1. Validação de livros duplicados na própria requisição
         Set<String> livrosUnicos = new HashSet<>(dto.livrosIds());
         if (livrosUnicos.size() < dto.livrosIds().size()) {
@@ -118,13 +129,20 @@ public class AluguelService {
     }
 
     /**
-     * Retorna o histórico paginado de aluguéis de um cliente específico (tela Minha Conta).
+     * Retorna o histórico paginado de aluguéis de um cliente específico (tela Minha Conta), validando posse.
      *
      * @param usuarioId Identificador UUID do leitor.
      * @param pageable Configurações de paginação.
      * @return Página de AluguelResumoResponseDTO do usuário.
      */
     public Page<AluguelResumoResponseDTO> listarPorUsuario(String usuarioId, Pageable pageable) {
+        // Validação de posse: cliente só pode consultar o seu próprio histórico
+        securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
+            if (usuarioLogado.perfil() == PerfilUsuario.cliente && !usuarioLogado.id().equals(usuarioId)) {
+                throw new CustomException(HttpStatus.FORBIDDEN, "ACESSO NEGADO: VOCÊ SÓ PODE ACESSAR SEUS PRÓPRIOS DADOS");
+            }
+        });
+
         if (usuarioRepository.findById(usuarioId).isEmpty()) {
             throw new CustomException(HttpStatus.NOT_FOUND, "USUÁRIO NÃO ENCONTRADO");
         }
@@ -133,14 +151,23 @@ public class AluguelService {
     }
 
     /**
-     * Busca os dados detalhados de um aluguel contendo a lista completa de livros emprestados.
+     * Busca os dados detalhados de um aluguel contendo a lista completa de livros, validando posse.
      *
      * @param id Identificador UUID do aluguel.
      * @return DTO com informações detalhadas do aluguel e dos livros.
      */
     public AluguelDetalhadoResponseDTO buscarDetalhado(String id) {
-        return aluguelRepository.findByIdComLivros(id)
+        AluguelDetalhadoResponseDTO detalhado = aluguelRepository.findByIdComLivros(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "ALUGUEL NÃO ENCONTRADO"));
+
+        // Validação de posse: cliente só pode consultar aluguel que pertença a ele
+        securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
+            if (usuarioLogado.perfil() == PerfilUsuario.cliente && !detalhado.usuarioId().equals(usuarioLogado.id())) {
+                throw new CustomException(HttpStatus.FORBIDDEN, "ACESSO NEGADO: ESTE ALUGUEL PERTENCE A OUTRO USUÁRIO");
+            }
+        });
+
+        return detalhado;
     }
 
     /**
@@ -182,6 +209,13 @@ public class AluguelService {
         Aluguel aluguel = aluguelRepository.findEntityById(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "ALUGUEL NÃO ENCONTRADO"));
 
+        // Validação de posse: cliente só pode devolver o seu próprio aluguel
+        securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
+            if (usuarioLogado.perfil() == PerfilUsuario.cliente && !aluguel.usuariosId().equals(usuarioLogado.id())) {
+                throw new CustomException(HttpStatus.FORBIDDEN, "ACESSO NEGADO: ESTE ALUGUEL PERTENCE A OUTRO USUÁRIO");
+            }
+        });
+
         if (aluguel.status() == StatusAluguel.concluido) {
             throw new CustomException(HttpStatus.BAD_REQUEST, "ESTE ALUGUEL JÁ FOI CONCLUÍDO ANTERIORMENTE");
         }
@@ -207,6 +241,13 @@ public class AluguelService {
     public AluguelDetalhadoResponseDTO cancelarAluguel(String id, AluguelCancelamentoDTO dto) {
         Aluguel aluguel = aluguelRepository.findEntityById(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "ALUGUEL NÃO ENCONTRADO"));
+
+        // Validação de posse: cliente só pode cancelar o seu próprio aluguel
+        securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
+            if (usuarioLogado.perfil() == PerfilUsuario.cliente && !aluguel.usuariosId().equals(usuarioLogado.id())) {
+                throw new CustomException(HttpStatus.FORBIDDEN, "ACESSO NEGADO: ESTE ALUGUEL PERTENCE A OUTRO USUÁRIO");
+            }
+        });
 
         if (aluguel.status() == StatusAluguel.concluido) {
             throw new CustomException(HttpStatus.BAD_REQUEST, "ALUGUEL JÁ CONCLUÍDO NÃO PODE SER CANCELADO");

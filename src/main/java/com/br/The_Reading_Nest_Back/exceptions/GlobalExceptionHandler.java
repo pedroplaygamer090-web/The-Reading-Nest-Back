@@ -7,6 +7,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -22,13 +24,14 @@ import java.util.List;
 /**
  * Explicação simples:
  * O guardião central de erros do backend. Quando qualquer parte da aplicação falha (ex: alguém
- * digita dados inválidos, uma rota não existe ou o banco recusa uma exclusão), esta classe intercepta
- * o problema e devolve sempre uma resposta padronizada, bonita e fácil de entender para o frontend.
+ * digita dados inválidos, tenta invadir uma área sem permissão, uma rota não existe ou o banco recusa uma exclusão),
+ * esta classe intercepta o problema e devolve sempre uma resposta padronizada, bonita e fácil de entender para o frontend.
  *
  * Explicação técnica:
- * Componente anotado com @RestControllerAdvice que intercepta globalmente exceções lançadas nos Controllers.
+ * Componente anotado com @RestControllerAdvice que intercepta globalmente exceções lançadas nos Controllers e camadas inferiores.
  * Converte cada tipo específico de exceção na estrutura uniforme 'ErrorResponseDTO' com o status HTTP adequado,
- * carimbo de data/hora (LocalDateTime.now()) e lista de erros legíveis, registrando falhas não tratadas
+ * carimbo de data/hora (LocalDateTime.now()) e lista de erros legíveis, tratando nativamente falhas de segurança
+ * do Spring Security (AccessDeniedException e AuthenticationException) e registrando falhas não tratadas
  * no log do servidor através da interface SLF4J (log.error).
  */
 @RestControllerAdvice
@@ -118,6 +121,38 @@ public class GlobalExceptionHandler {
                 LocalDateTime.now()
         );
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(resposta);
+    }
+
+    /**
+     * Intercepta falhas de autorização do Spring Security disparadas em nível de método ou controller.
+     *
+     * @param ex Exceção de acesso negado por falta de privilégio hierárquico.
+     * @return Resposta com status 403 Forbidden padronizada em JSON.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleAccessDeniedException(AccessDeniedException ex) {
+        ErrorResponseDTO resposta = new ErrorResponseDTO(
+                HttpStatus.FORBIDDEN.value(),
+                List.of("ACESSO NEGADO: VOCÊ NÃO TEM PERMISSÃO PARA ACESSAR ESTE RECURSO"),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(resposta);
+    }
+
+    /**
+     * Intercepta falhas de autenticação do Spring Security disparadas em tempo de execução.
+     *
+     * @param ex Exceção de falha de autenticação ou credencial inválida.
+     * @return Resposta com status 401 Unauthorized padronizada em JSON.
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleAuthenticationException(AuthenticationException ex) {
+        ErrorResponseDTO resposta = new ErrorResponseDTO(
+                HttpStatus.UNAUTHORIZED.value(),
+                List.of("ACESSO NÃO AUTORIZADO: CREDENCIAIS INVÁLIDAS OU NÃO FORNECIDAS"),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(resposta);
     }
 
     /**
