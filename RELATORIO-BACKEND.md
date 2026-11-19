@@ -54,6 +54,7 @@ O fluxo de dados da aplicação adota o estilo arquitetural RESTful em camadas e
    - Falhas de validação são interceptadas pelo `GlobalExceptionHandler`, devolvendo `400 Bad Request` com array de mensagens legíveis.
 6. **Camada de Serviço (`Services`):**
    - Centraliza 100% da inteligência e lógica de negócio.
+   - Os Services trabalham com entidades e agregados de domínio, como `AluguelCompleto`, e não formatam diretamente contratos HTTP.
    - Aplica a **validação de dono**: clientes comuns só podem visualizar ou alterar dados e aluguéis vinculados ao seu próprio ID de usuário.
    - Executa transações atômicas com `@Transactional`.
 7. **Camada de Acesso a Dados (`Repositories`):**
@@ -61,13 +62,13 @@ O fluxo de dados da aplicação adota o estilo arquitetural RESTful em camadas e
    - Projeta explicitamente todas as colunas SQL (proibido o uso de `SELECT *`).
    - Mapeia resultados via `RowMapper` para records Java imutáveis.
 8. **Resposta Formatada:**
-   - DTOs higienizados (sem senhas e sem dados confidenciais) são serializados em JSON e entregues ao frontend com o código HTTP adequado (`200 OK`, `201 Created`, `204 No Content`).
+   - Os Controllers recebem as entidades ou agregados retornados pelos Services e chamam os Mappers para convertê-los em DTOs higienizados (sem senhas e sem dados confidenciais), que são serializados em JSON e entregues ao frontend com o código HTTP adequado (`200 OK`, `201 Created`, `204 No Content`).
 
 ---
 
 ## 2. Mapa Completo de Pacotes e Classes
 
-O backend está organizado em 9 pacotes modulares no namespace `com.br.The_Reading_Nest_Back`:
+O backend está organizado em 9 pacotes modulares no namespace `com.br.The_Reading_Nest_Back`, totalizando 54 classes Java:
 
 ### 2.1. `config` — Configurações Gerais da Aplicação
 - **`CorsConfig.java`**: Configura a política de Cross-Origin Resource Sharing no Spring MVC, liberando requisições do frontend nas portas do Live Server (`5500`).
@@ -78,6 +79,7 @@ O backend está organizado em 9 pacotes modulares no namespace `com.br.The_Readi
 - **`Livro.java`**: Record imutável representando as obras do acervo (`id`, `generosId`, `titulo`, `autor`, `descricao`, `anoPublicacao`, `isbn`, `quantidadeDisponivel`, `statusLivro`).
 - **`Usuario.java`**: Record imutável para usuários do sistema (`id`, `nome`, `email`, `@JsonIgnore senha`, `perfil`, `statusConta`).
 - **`Aluguel.java`**: Record imutável do cabeçalho de empréstimos (`id`, `usuariosId`, `dataAluguel`, `dataDevolucaoPrevista`, `status`).
+- **`AluguelCompleto.java`**: Agregado de domínio que reúne o cabeçalho `Aluguel` e a lista de entidades `Livro` vinculadas ao empréstimo.
 - **`DetalheAluguel.java`**: Record imutável associativo da relação N:N entre empréstimos e livros (`id`, `alugueisId`, `livrosId`).
 - **`PerfilUsuario.java`**: Enumeração com os perfis de acesso do sistema (`admin`, `cliente`).
 - **`StatusLivro.java`**: Enumeração da situação do exemplar (`ativo`, `desativado`).
@@ -125,7 +127,7 @@ O backend está organizado em 9 pacotes modulares no namespace `com.br.The_Readi
 - **`UsuarioMapper.java`**: Converte `UsuarioRequestDTO` em `Usuario` e `Usuario` em `UsuarioResponseDTO`.
 - **`LivroMapper.java`**: Converte `LivroRequestDTO` na entidade `Livro`.
 - **`GeneroMapper.java`**: Converte `GeneroRequestDTO` na entidade `Genero` e projeta `GeneroResponseDTO`.
-- **`AluguelMapper.java`**: Transforma dados de locação nas entidades `Aluguel` e `DetalheAluguel`.
+- **`AluguelMapper.java`**: Transforma dados de locação nas entidades `Aluguel` e `DetalheAluguel` e converte `AluguelCompleto` em DTO detalhado para os Controllers responderem.
 
 ### 2.8. `security` — Camada de Autenticação e Autorização JWT
 - **`JwtService.java`**: Gera, decodifica e valida tokens HMAC-SHA256, contendo subject (e-mail) e claims de id, nome e perfil.
@@ -153,7 +155,7 @@ O backend está organizado em 9 pacotes modulares no namespace `com.br.The_Readi
 | **PUT** | `/usuarios/{id}` | Autenticado *(Dono ou Admin)* | `UsuarioUpdateDTO` (`nome`, `email`, `senha?`, `perfil?`, `statusConta?`) | `200 OK` + `UsuarioResponseDTO` |
 | **DELETE** | `/usuarios/{id}` | **Apenas Admin** | Nenhum | `204 No Content` |
 | **GET** | `/generos` | Público | Nenhum (Parâmetros: `page`, `size`) | `200 OK` + `Page<GeneroResponseDTO>` |
-| **GET** | `/generos/{id}` | Público | Nenhum | `200 OK` + `Genero` |
+| **GET** | `/generos/{id}` | Público | Nenhum | `200 OK` + `GeneroResponseDTO` |
 | **POST** | `/generos` | **Apenas Admin** | `GeneroRequestDTO` (`nome`) | `201 Created` + `GeneroResponseDTO` |
 | **PUT** | `/generos/{id}` | **Apenas Admin** | `GeneroRequestDTO` (`nome`) | `200 OK` + `GeneroResponseDTO` |
 | **DELETE** | `/generos/{id}` | **Apenas Admin** | Nenhum | `204 No Content` |
@@ -193,6 +195,7 @@ O backend está organizado em 9 pacotes modulares no namespace `com.br.The_Readi
   ```
   Isso previne condições de corrida (*race conditions*) em requisições paralelas, garantindo que o saldo de exemplares nunca fique negativo.
 - Em devoluções ou cancelamentos de aluguéis ativos/atrasados, o estoque é restituído de maneira transacional via `UPDATE livros SET quantidade_disponivel = quantidade_disponivel + 1 WHERE id = ?`.
+- Um aluguel devolvido ou cancelado somente é atualizado para concluído por uma operação condicional que exige `status <> 'concluido'`; após essa confirmação, o estoque é restituído uma única vez. Repetições da mesma devolução ou cancelamento são rejeitadas antes da nova reposição.
 
 ### 4.4. Padronização Global de Erros HTTP
 Toda e qualquer recusa operacional, erro de validação ou exceção interna segue rigorosamente a estrutura uniforme em JSON:
