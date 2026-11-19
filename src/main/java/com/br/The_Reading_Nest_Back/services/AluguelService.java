@@ -1,7 +1,17 @@
 package com.br.The_Reading_Nest_Back.services;
 
-import com.br.The_Reading_Nest_Back.dtos.*;
-import com.br.The_Reading_Nest_Back.entities.*;
+import com.br.The_Reading_Nest_Back.dtos.AluguelCancelamentoDTO;
+import com.br.The_Reading_Nest_Back.dtos.AluguelRequestDTO;
+import com.br.The_Reading_Nest_Back.dtos.AluguelUpdateDTO;
+import com.br.The_Reading_Nest_Back.entities.Aluguel;
+import com.br.The_Reading_Nest_Back.entities.AluguelCompleto;
+import com.br.The_Reading_Nest_Back.entities.DetalheAluguel;
+import com.br.The_Reading_Nest_Back.entities.Livro;
+import com.br.The_Reading_Nest_Back.entities.PerfilUsuario;
+import com.br.The_Reading_Nest_Back.entities.StatusAluguel;
+import com.br.The_Reading_Nest_Back.entities.StatusConta;
+import com.br.The_Reading_Nest_Back.entities.StatusLivro;
+import com.br.The_Reading_Nest_Back.entities.Usuario;
 import com.br.The_Reading_Nest_Back.exceptions.CustomException;
 import com.br.The_Reading_Nest_Back.mappers.AluguelMapper;
 import com.br.The_Reading_Nest_Back.repositories.AluguelRepository;
@@ -27,13 +37,13 @@ import java.util.UUID;
  * O cérebro das operações de aluguel e empréstimo de livros. Ele confere se o leitor está com a conta ativa,
  * se há exemplares suficientes na estante antes de permitir a retirada, diminui o estoque na hora,
  * devolve os livros ao acervo quando o aluguel é concluído ou cancelado e garante que cada leitor
- * só mexa nos seus próprios empréstimos.
+ * só mexa nos seus próprios empréstimos, trabalhando unicamente com entidades e agregados de domínio.
  *
  * Explicação técnica:
  * Camada de serviço de ciclo de vida de aluguéis com transações atômicas (@Transactional).
  * Implementa controle de concorrência com decremento condicional no MySQL (evitando estoque negativo),
  * valida a propriedade do recurso (owner checking) através do SecurityUtils para clientes comuns,
- * e restitui o estoque atômico de livros em operações de devolução e cancelamento.
+ * e restitui o estoque atômico de livros em operações de devolução e cancelamento, retornando agregados AluguelCompleto.
  */
 @Service
 public class AluguelService {
@@ -64,10 +74,10 @@ public class AluguelService {
      * Cria um novo aluguel de forma atômica, validando permissão de dono, leitor, livros e decrementando o estoque físico.
      *
      * @param dto Dados do empréstimo contendo usuário, data de entrega e lista de IDs dos livros.
-     * @return DTO com a visão detalhada do aluguel recém-criado e seus livros vinculados.
+     * @return Objeto de domínio AluguelCompleto recém-criado.
      */
     @Transactional
-    public AluguelDetalhadoResponseDTO criarAluguel(AluguelRequestDTO dto) {
+    public AluguelCompleto criarAluguel(AluguelRequestDTO dto) {
         // Validação de posse: cliente só pode alugar em seu próprio nome
         securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
             if (usuarioLogado.perfil() == PerfilUsuario.cliente && !usuarioLogado.id().equals(dto.usuarioId())) {
@@ -122,9 +132,9 @@ public class AluguelService {
      * Retorna a listagem paginada de aluguéis não concluídos ('ativo' e 'atrasado') para o administrador.
      *
      * @param pageable Configurações de paginação do Spring Data.
-     * @return Página de AluguelResumoResponseDTO ordenada por urgência de entrega.
+     * @return Página de entidades Aluguel ordenada por urgência de entrega.
      */
-    public Page<AluguelResumoResponseDTO> listarNaoConcluidos(Pageable pageable) {
+    public Page<Aluguel> listarNaoConcluidos(Pageable pageable) {
         return aluguelRepository.findNaoConcluidos(pageable);
     }
 
@@ -133,9 +143,9 @@ public class AluguelService {
      *
      * @param usuarioId Identificador UUID do leitor.
      * @param pageable Configurações de paginação.
-     * @return Página de AluguelResumoResponseDTO do usuário.
+     * @return Página de entidades Aluguel do usuário.
      */
-    public Page<AluguelResumoResponseDTO> listarPorUsuario(String usuarioId, Pageable pageable) {
+    public Page<Aluguel> listarPorUsuario(String usuarioId, Pageable pageable) {
         // Validação de posse: cliente só pode consultar o seu próprio histórico
         securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
             if (usuarioLogado.perfil() == PerfilUsuario.cliente && !usuarioLogado.id().equals(usuarioId)) {
@@ -151,23 +161,23 @@ public class AluguelService {
     }
 
     /**
-     * Busca os dados detalhados de um aluguel contendo a lista completa de livros, validando posse.
+     * Busca os dados agregados de um aluguel contendo a lista completa de livros, validando posse.
      *
      * @param id Identificador UUID do aluguel.
-     * @return DTO com informações detalhadas do aluguel e dos livros.
+     * @return Objeto de domínio AluguelCompleto.
      */
-    public AluguelDetalhadoResponseDTO buscarDetalhado(String id) {
-        AluguelDetalhadoResponseDTO detalhado = aluguelRepository.findByIdComLivros(id)
+    public AluguelCompleto buscarDetalhado(String id) {
+        AluguelCompleto completo = aluguelRepository.findCompletoById(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "ALUGUEL NÃO ENCONTRADO"));
 
         // Validação de posse: cliente só pode consultar aluguel que pertença a ele
         securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
-            if (usuarioLogado.perfil() == PerfilUsuario.cliente && !detalhado.usuarioId().equals(usuarioLogado.id())) {
+            if (usuarioLogado.perfil() == PerfilUsuario.cliente && !completo.aluguel().usuariosId().equals(usuarioLogado.id())) {
                 throw new CustomException(HttpStatus.FORBIDDEN, "ACESSO NEGADO: ESTE ALUGUEL PERTENCE A OUTRO USUÁRIO");
             }
         });
 
-        return detalhado;
+        return completo;
     }
 
     /**
@@ -175,10 +185,10 @@ public class AluguelService {
      *
      * @param id Identificador UUID do aluguel.
      * @param dto Novos parâmetros para o aluguel.
-     * @return DTO detalhado atualizado.
+     * @return AluguelCompleto atualizado.
      */
     @Transactional
-    public AluguelDetalhadoResponseDTO atualizarAluguel(String id, AluguelUpdateDTO dto) {
+    public AluguelCompleto atualizarAluguel(String id, AluguelUpdateDTO dto) {
         Aluguel aluguelAtual = aluguelRepository.findEntityById(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "ALUGUEL NÃO ENCONTRADO"));
 
@@ -202,10 +212,10 @@ public class AluguelService {
      * Registra a devolução dos livros de um aluguel, marcando-o como concluído e repondo os itens ao estoque.
      *
      * @param id Identificador UUID do aluguel a ser finalizado.
-     * @return DTO detalhado com status concluído.
+     * @return AluguelCompleto com status concluído.
      */
     @Transactional
-    public AluguelDetalhadoResponseDTO devolverAluguel(String id) {
+    public AluguelCompleto devolverAluguel(String id) {
         Aluguel aluguel = aluguelRepository.findEntityById(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "ALUGUEL NÃO ENCONTRADO"));
 
@@ -235,10 +245,10 @@ public class AluguelService {
      *
      * @param id Identificador UUID do aluguel a ser cancelado.
      * @param dto Justificativa opcional fornecida pelo usuário ou administrador.
-     * @return DTO detalhado atualizado.
+     * @return AluguelCompleto atualizado.
      */
     @Transactional
-    public AluguelDetalhadoResponseDTO cancelarAluguel(String id, AluguelCancelamentoDTO dto) {
+    public AluguelCompleto cancelarAluguel(String id, AluguelCancelamentoDTO dto) {
         Aluguel aluguel = aluguelRepository.findEntityById(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "ALUGUEL NÃO ENCONTRADO"));
 

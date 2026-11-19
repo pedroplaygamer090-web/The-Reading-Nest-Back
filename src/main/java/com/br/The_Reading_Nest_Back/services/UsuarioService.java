@@ -1,7 +1,6 @@
 package com.br.The_Reading_Nest_Back.services;
 
 import com.br.The_Reading_Nest_Back.dtos.UsuarioRequestDTO;
-import com.br.The_Reading_Nest_Back.dtos.UsuarioResponseDTO;
 import com.br.The_Reading_Nest_Back.dtos.UsuarioUpdateDTO;
 import com.br.The_Reading_Nest_Back.entities.PerfilUsuario;
 import com.br.The_Reading_Nest_Back.entities.StatusConta;
@@ -24,13 +23,13 @@ import java.util.UUID;
  * O cérebro do gerenciamento de leitores e administradores da biblioteca.
  * Cuida para que ninguém use o mesmo e-mail duas vezes, criptografa a senha de todos,
  * assegura que apenas administradores possam criar ou promover contas de administrador,
- * e garante que um cliente comum só consiga ver e editar os seus próprios dados cadastrais.
+ * e garante que um cliente comum só consiga ver e editar os seus próprios dados cadastrais, retornando entidades Usuario.
  *
  * Explicação técnica:
  * Camada de serviço de domínio para gerenciamento de usuários.
  * Integra transações declarativas (@Transactional), hashing BCrypt, verificação de integridade
  * de chave única (e-mail) e controle de acesso granular baseado no usuário autenticado (SecurityUtils),
- * aplicando validação de dono (owner checking) e restringindo a atribuição de PerfilUsuario.admin a administradores.
+ * devolvendo sempre a entidade pura Usuario.
  */
 @Service
 public class UsuarioService {
@@ -56,10 +55,10 @@ public class UsuarioService {
      * Cadastra um novo usuário no sistema com perfil validado e senha criptografada.
      *
      * @param dto Formulário com dados do usuário (nome, e-mail, senha e perfil opcional).
-     * @return DTO com os dados do usuário cadastrado (sem a senha).
+     * @return Entidade Usuario cadastrada.
      */
     @Transactional
-    public UsuarioResponseDTO criar(UsuarioRequestDTO dto) {
+    public Usuario criar(UsuarioRequestDTO dto) {
         if (usuarioRepository.existsByEmail(dto.email().trim())) {
             throw new CustomException(HttpStatus.CONFLICT, "JÁ EXISTE UM USUÁRIO CADASTRADO COM ESTE E-MAIL");
         }
@@ -81,16 +80,16 @@ public class UsuarioService {
         Usuario usuario = usuarioMapper.toEntity(id, dto, senhaHash, perfilFinal);
         usuarioRepository.insert(usuario);
 
-        return usuarioMapper.toResponseDTO(usuario);
+        return usuario;
     }
 
     /**
      * Retorna a listagem paginada de todos os usuários cadastrados (sem as senhas).
      *
      * @param pageable Configurações de paginação do Spring Data.
-     * @return Página de UsuarioResponseDTO.
+     * @return Página de entidades Usuario.
      */
-    public Page<UsuarioResponseDTO> listar(Pageable pageable) {
+    public Page<Usuario> listar(Pageable pageable) {
         return usuarioRepository.findAll(pageable);
     }
 
@@ -98,9 +97,9 @@ public class UsuarioService {
      * Busca dados cadastrais públicos de um usuário pelo seu ID, validando se o cliente é o proprietário.
      *
      * @param id Identificador UUID do usuário.
-     * @return DTO com os dados do usuário.
+     * @return Entidade Usuario localizada.
      */
-    public UsuarioResponseDTO buscarPorId(String id) {
+    public Usuario buscarPorId(String id) {
         // Validação de posse: cliente só pode consultar seu próprio ID
         securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
             if (usuarioLogado.perfil() == PerfilUsuario.cliente && !usuarioLogado.id().equals(id)) {
@@ -117,10 +116,10 @@ public class UsuarioService {
      *
      * @param id Identificador UUID do usuário a ser atualizado.
      * @param dto Formulário de atualização.
-     * @return DTO atualizado do usuário.
+     * @return Entidade Usuario atualizada.
      */
     @Transactional
-    public UsuarioResponseDTO atualizar(String id, UsuarioUpdateDTO dto) {
+    public Usuario atualizar(String id, UsuarioUpdateDTO dto) {
         Usuario usuarioAtual = usuarioRepository.findEntityById(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "USUÁRIO NÃO ENCONTRADO"));
 
@@ -166,20 +165,31 @@ public class UsuarioService {
 
         usuarioRepository.update(usuarioAtualizado, atualizarSenha);
 
-        return usuarioMapper.toResponseDTO(usuarioAtualizado);
+        return usuarioAtualizado;
     }
 
     /**
-     * Desativa a conta de um usuário (soft-delete), mantendo seus empréstimos e histórico no sistema.
+     * Desativa uma conta de usuário no sistema (soft-delete).
      *
      * @param id Identificador UUID do usuário a ser desativado.
      */
     @Transactional
     public void excluir(String id) {
+        // Validação de posse: cliente só pode excluir/desativar a própria conta
+        securityUtils.getUsuarioAutenticado().ifPresent(usuarioLogado -> {
+            if (usuarioLogado.perfil() == PerfilUsuario.cliente && !usuarioLogado.id().equals(id)) {
+                throw new CustomException(HttpStatus.FORBIDDEN, "ACESSO NEGADO: VOCÊ SÓ PODE ACESSAR SEUS PRÓPRIOS DADOS");
+            }
+        });
+
         if (usuarioRepository.findById(id).isEmpty()) {
             throw new CustomException(HttpStatus.NOT_FOUND, "USUÁRIO NÃO ENCONTRADO");
         }
 
-        usuarioRepository.updateStatus(id, StatusConta.desativado);
+        if (usuarioRepository.hasAlugueisAtivos(id)) {
+            throw new CustomException(HttpStatus.CONFLICT, "NÃO É POSSÍVEL DESATIVAR USUÁRIO COM ALUGUÉIS PENDENTES DE DEVOLUÇÃO");
+        }
+
+        usuarioRepository.softDelete(id);
     }
 }

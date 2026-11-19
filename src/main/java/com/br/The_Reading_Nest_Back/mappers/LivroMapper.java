@@ -12,9 +12,8 @@ import org.springframework.stereotype.Component;
  * na entidade Livro, bem como empacotar os dados do livro para envio de volta ao navegador.
  *
  * Explicação técnica:
- * Componente anotado com @Component responsável pelo mapeamento de dados entre LivroRequestDTO,
- * Livro (Record) e LivroResponseDTO. Define fallback padrão para 'statusLivro' (ativo caso nulo)
- * e higieniza strings textuais para persistência consistente no banco.
+ * Componente anotado com @Component responsável pelo mapeamento bidirecional de dados entre LivroRequestDTO,
+ * Livro (Record) e LivroResponseDTO.
  */
 @Component
 public class LivroMapper {
@@ -31,6 +30,7 @@ public class LivroMapper {
         return new Livro(
                 id,
                 dto.generoId(),
+                null,
                 dto.titulo().trim(),
                 dto.autor().trim(),
                 dto.descricao() != null ? dto.descricao().trim() : null,
@@ -42,7 +42,28 @@ public class LivroMapper {
     }
 
     /**
-     * Converte a entidade interna Livro juntamente com o nome textual do gênero no DTO de resposta.
+     * Converte a entidade interna Livro no DTO de resposta, extraindo o nome do gênero da própria entidade.
+     *
+     * @param entity Entidade Livro vinda do banco ou do serviço.
+     * @return DTO serializado para o frontend.
+     */
+    public LivroResponseDTO toResponseDTO(Livro entity) {
+        return new LivroResponseDTO(
+                entity.id(),
+                entity.generosId(),
+                entity.generoNome(),
+                entity.titulo(),
+                entity.autor(),
+                entity.descricao(),
+                entity.anoPublicacao(),
+                entity.isbn(),
+                entity.quantidadeDisponivel(),
+                entity.statusLivro()
+        );
+    }
+
+    /**
+     * Converte a entidade interna Livro juntamente com o nome textual explícito do gênero no DTO de resposta.
      *
      * @param entity Entidade Livro vinda do banco.
      * @param generoNome Nome textual do gênero literário correspondente.
@@ -52,7 +73,7 @@ public class LivroMapper {
         return new LivroResponseDTO(
                 entity.id(),
                 entity.generosId(),
-                generoNome,
+                generoNome != null ? generoNome : entity.generoNome(),
                 entity.titulo(),
                 entity.autor(),
                 entity.descricao(),

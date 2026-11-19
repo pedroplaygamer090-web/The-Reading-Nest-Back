@@ -1,7 +1,6 @@
 package com.br.The_Reading_Nest_Back.services;
 
 import com.br.The_Reading_Nest_Back.dtos.LivroRequestDTO;
-import com.br.The_Reading_Nest_Back.dtos.LivroResponseDTO;
 import com.br.The_Reading_Nest_Back.entities.Genero;
 import com.br.The_Reading_Nest_Back.entities.Livro;
 import com.br.The_Reading_Nest_Back.entities.StatusLivro;
@@ -20,14 +19,14 @@ import java.util.UUID;
 /**
  * Explicação simples:
  * O cérebro do acervo de livros da biblioteca. Ele valida se a categoria informada existe de verdade,
- * impede que dois livros tenham o mesmo código ISBN, gera o código único do livro (UUID) e, em vez de
- * apagar o livro e perder o histórico de empréstimos, realiza uma desativação segura (soft-delete).
+ * impede que dois livros tenham o mesmo código ISBN, gera o código único do livro (UUID) e realiza
+ * uma desativação segura (soft-delete), devolvendo sempre entidades Livro puras.
  *
  * Explicação técnica:
  * Camada de serviço de negócios para a entidade Livro. Orquestra regras de integridade de domínio,
  * tais como existência prévia da chave estrangeira de gênero antes da inserção, unicidade de ISBN,
- * controle transacional (@Transactional) para isolamento ACID e implementação do padrão de soft-delete
- * no método de remoção HTTP DELETE, alterando o status para StatusLivro.desativado.
+ * controle transacional (@Transactional) para isolamento ACID e implementação do padrão de soft-delete,
+ * devolvendo sempre a entidade pura Livro sem expor DTOs na camada de negócio.
  */
 @Service
 public class LivroService {
@@ -46,10 +45,10 @@ public class LivroService {
      * Cadastra um novo livro na biblioteca após validar integridade do gênero e unicidade do ISBN.
      *
      * @param dto Informações do livro a ser adicionado ao acervo.
-     * @return DTO com os dados do livro salvo e o nome do seu gênero.
+     * @return Entidade Livro salva com seu UUID e nome de gênero preenchidos.
      */
     @Transactional
-    public LivroResponseDTO criar(LivroRequestDTO dto) {
+    public Livro criar(LivroRequestDTO dto) {
         Genero genero = generoRepository.findById(dto.generoId())
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "GÊNERO INFORMADO NÃO ENCONTRADO"));
 
@@ -61,7 +60,18 @@ public class LivroService {
         Livro livro = livroMapper.toEntity(id, dto);
         livroRepository.insert(livro);
 
-        return livroMapper.toResponseDTO(livro, genero.nome());
+        return new Livro(
+                id,
+                livro.generosId(),
+                genero.nome(),
+                livro.titulo(),
+                livro.autor(),
+                livro.descricao(),
+                livro.anoPublicacao(),
+                livro.isbn(),
+                livro.quantidadeDisponivel(),
+                livro.statusLivro()
+        );
     }
 
     /**
@@ -70,9 +80,9 @@ public class LivroService {
      * @param status Filtro opcional por status do livro ('ativo' ou 'desativado').
      * @param generoId Filtro opcional por identificador do gênero.
      * @param pageable Configurações de paginação do Spring Data.
-     * @return Página de LivroResponseDTO.
+     * @return Página de entidades Livro.
      */
-    public Page<LivroResponseDTO> listar(StatusLivro status, String generoId, Pageable pageable) {
+    public Page<Livro> listar(StatusLivro status, String generoId, Pageable pageable) {
         return livroRepository.findAll(status, generoId, pageable);
     }
 
@@ -80,9 +90,9 @@ public class LivroService {
      * Busca os detalhes de um livro pelo seu identificador UUID.
      *
      * @param id Identificador do livro.
-     * @return DTO completo com detalhes do livro e de sua categoria.
+     * @return Entidade Livro localizada com nome de gênero.
      */
-    public LivroResponseDTO buscarPorId(String id) {
+    public Livro buscarPorId(String id) {
         return livroRepository.findById(id)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "LIVRO NÃO ENCONTRADO"));
     }
@@ -92,10 +102,10 @@ public class LivroService {
      *
      * @param id Identificador UUID do livro em modificação.
      * @param dto Novos dados para o livro.
-     * @return DTO do livro com dados atualizados.
+     * @return Entidade Livro com os dados atualizados.
      */
     @Transactional
-    public LivroResponseDTO atualizar(String id, LivroRequestDTO dto) {
+    public Livro atualizar(String id, LivroRequestDTO dto) {
         if (livroRepository.findById(id).isEmpty()) {
             throw new CustomException(HttpStatus.NOT_FOUND, "LIVRO NÃO ENCONTRADO");
         }
@@ -110,7 +120,18 @@ public class LivroService {
         Livro livro = livroMapper.toEntity(id, dto);
         livroRepository.update(livro);
 
-        return livroMapper.toResponseDTO(livro, genero.nome());
+        return new Livro(
+                id,
+                livro.generosId(),
+                genero.nome(),
+                livro.titulo(),
+                livro.autor(),
+                livro.descricao(),
+                livro.anoPublicacao(),
+                livro.isbn(),
+                livro.quantidadeDisponivel(),
+                livro.statusLivro()
+        );
     }
 
     /**
@@ -124,6 +145,10 @@ public class LivroService {
             throw new CustomException(HttpStatus.NOT_FOUND, "LIVRO NÃO ENCONTRADO");
         }
 
-        livroRepository.updateStatus(id, StatusLivro.desativado);
+        if (livroRepository.hasAlugueisAtivos(id)) {
+            throw new CustomException(HttpStatus.CONFLICT, "NÃO É POSSÍVEL DESATIVAR UM LIVRO COM ALUGUÉIS ATIVOS OU ATRASADOS");
+        }
+
+        livroRepository.softDelete(id);
     }
 }

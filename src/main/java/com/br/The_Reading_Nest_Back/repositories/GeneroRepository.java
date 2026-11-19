@@ -1,6 +1,5 @@
 package com.br.The_Reading_Nest_Back.repositories;
 
-import com.br.The_Reading_Nest_Back.dtos.GeneroResponseDTO;
 import com.br.The_Reading_Nest_Back.entities.Genero;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -16,13 +15,13 @@ import java.util.Optional;
  * Explicação simples:
  * Responsável por conversar diretamente com a tabela de categorias e gêneros literários no banco de dados.
  * Aqui nós inserimos novos gêneros, consultamos a lista de forma organizada e paginada, alteramos nomes
- * e apagamos categorias existentes.
+ * e apagamos categorias existentes, devolvendo sempre a entidade Genero pura.
  *
  * Explicação técnica:
  * Componente anotado com @Repository que encapsula o acesso à tabela 'generos' utilizando exclusivamente
  * o Spring JdbcTemplate. Todas as consultas são parametrizadas com placeholders '?' para mitigar
  * integralmente ataques de SQL Injection, com projeção explícita de colunas (ausência de SELECT *),
- * paginação via LIMIT e OFFSET, e conversão dos resultados através de instâncias reutilizáveis de RowMapper.
+ * paginação via LIMIT e OFFSET, e conversão dos resultados através do RowMapper da entidade pura Genero.
  */
 @Repository
 public class GeneroRepository {
@@ -33,14 +32,6 @@ public class GeneroRepository {
      * Mapeador que transforma cada linha retornada do banco em uma entidade Genero.
      */
     private final RowMapper<Genero> generoRowMapper = (rs, rowNum) -> new Genero(
-            rs.getString("id"),
-            rs.getString("nome")
-    );
-
-    /**
-     * Mapeador que projeta a linha do banco diretamente em um GeneroResponseDTO.
-     */
-    private final RowMapper<GeneroResponseDTO> generoResponseRowMapper = (rs, rowNum) -> new GeneroResponseDTO(
             rs.getString("id"),
             rs.getString("nome")
     );
@@ -64,17 +55,17 @@ public class GeneroRepository {
      * Busca todos os gêneros de forma paginada ordenados em ordem alfabética.
      *
      * @param pageable Configuração de página (número da página e tamanho).
-     * @return Página (Page) contendo os registros da janela atual e a contagem total de itens.
+     * @return Página (Page) contendo as entidades Genero da janela atual e a contagem total de itens.
      */
-    public Page<GeneroResponseDTO> findAll(Pageable pageable) {
+    public Page<Genero> findAll(Pageable pageable) {
         String sqlCount = "SELECT COUNT(id) FROM generos";
         Long total = jdbcTemplate.queryForObject(sqlCount, Long.class);
         long totalRegistros = total != null ? total : 0L;
 
         String sql = "SELECT id, nome FROM generos ORDER BY nome ASC LIMIT ? OFFSET ?";
-        List<GeneroResponseDTO> generos = jdbcTemplate.query(
+        List<Genero> generos = jdbcTemplate.query(
                 sql,
-                generoResponseRowMapper,
+                generoRowMapper,
                 pageable.getPageSize(),
                 pageable.getOffset()
         );
@@ -98,7 +89,7 @@ public class GeneroRepository {
      * Verifica se já existe um gênero com o mesmo nome no banco de dados (ignorando maiúsculas/minúsculas).
      *
      * @param nome Nome do gênero pesquisado.
-     * @return Verdadeiro se o nome já estiver em uso, falso caso contrário.
+     * @return Verdadeiro se existir duplicidade.
      */
     public boolean existsByNome(String nome) {
         String sql = "SELECT COUNT(id) FROM generos WHERE LOWER(nome) = LOWER(?)";
@@ -107,11 +98,11 @@ public class GeneroRepository {
     }
 
     /**
-     * Verifica se existe outro gênero com o mesmo nome, desconsiderando o ID informado (usado na edição).
+     * Verifica se já existe outro gênero com o mesmo nome, excetuando o registro com o ID fornecido (para edição).
      *
-     * @param nome Nome pretendido.
-     * @param id ID do registro atual em alteração.
-     * @return Verdadeiro se houver conflito de duplicidade com outro ID.
+     * @param nome Novo nome desejado.
+     * @param id ID do gênero atual em edição.
+     * @return Verdadeiro se colidir com outro registro.
      */
     public boolean existsByNomeAndIdNot(String nome, String id) {
         String sql = "SELECT COUNT(id) FROM generos WHERE LOWER(nome) = LOWER(?) AND id <> ?";
@@ -120,9 +111,9 @@ public class GeneroRepository {
     }
 
     /**
-     * Atualiza as informações de um gênero existente.
+     * Atualiza o nome de um gênero já existente.
      *
-     * @param genero Entidade com os novos dados e o respectivo UUID.
+     * @param genero Entidade com os dados modificados.
      * @return Quantidade de linhas modificadas no banco.
      */
     public int update(Genero genero) {
@@ -131,13 +122,25 @@ public class GeneroRepository {
     }
 
     /**
-     * Exclui fisicamente um gênero do acervo pelo seu identificador UUID.
+     * Exclui um gênero da base de dados.
      *
-     * @param id Identificador do gênero.
-     * @return Quantidade de linhas excluídas.
+     * @param id Identificador UUID da categoria.
+     * @return Quantidade de linhas afetadas.
      */
     public int deleteById(String id) {
         String sql = "DELETE FROM generos WHERE id = ?";
         return jdbcTemplate.update(sql, id);
+    }
+
+    /**
+     * Verifica se existem livros vinculados a um determinado gênero literário antes de permitir sua exclusão.
+     *
+     * @param id Identificador UUID do gênero.
+     * @return Verdadeiro se houver livros referenciando esta categoria.
+     */
+    public boolean hasLivrosVinculados(String id) {
+        String sql = "SELECT COUNT(id) FROM livros WHERE generos_id = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
+        return count != null && count > 0;
     }
 }

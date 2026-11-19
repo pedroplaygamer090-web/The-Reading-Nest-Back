@@ -1,10 +1,9 @@
 package com.br.The_Reading_Nest_Back.repositories;
 
-import com.br.The_Reading_Nest_Back.dtos.AluguelDetalhadoResponseDTO;
-import com.br.The_Reading_Nest_Back.dtos.AluguelResumoResponseDTO;
-import com.br.The_Reading_Nest_Back.dtos.LivroResponseDTO;
 import com.br.The_Reading_Nest_Back.entities.Aluguel;
+import com.br.The_Reading_Nest_Back.entities.AluguelCompleto;
 import com.br.The_Reading_Nest_Back.entities.DetalheAluguel;
+import com.br.The_Reading_Nest_Back.entities.Livro;
 import com.br.The_Reading_Nest_Back.entities.StatusAluguel;
 import com.br.The_Reading_Nest_Back.entities.StatusLivro;
 import org.springframework.data.domain.Page;
@@ -23,13 +22,12 @@ import java.util.Optional;
  * Explicação simples:
  * Gerencia todas as tabelas de aluguéis e empréstimos da biblioteca ('alugueis' e 'detalhes_alugueis').
  * Registra quando um leitor retira livros, busca os aluguéis pendentes para o painel do administrador,
- * recupera o histórico da conta do leitor e atualiza os prazos e devoluções.
+ * recupera o histórico da conta do leitor e atualiza os prazos e devoluções, retornando exclusivamente entidades de domínio.
  *
  * Explicação técnica:
  * Repositório que orquestra a persistência relacional pura via JdbcTemplate entre a entidade-mestre 'alugueis'
- * e os itens associados em 'detalhes_alugueis'. Realiza projeções otimizadas para leitura rápida sem carregar
- * dados redundantes em listagens e consolida consultas com INNER JOIN nas tabelas 'usuarios', 'livros' e 'generos'
- * para composição de DTOs detalhados.
+ * e os itens associados em 'detalhes_alugueis'. Opera 100% sobre entidades puras (Aluguel, Livro, AluguelCompleto),
+ * sem acoplamento a DTOs de transporte da camada web.
  */
 @Repository
 public class AluguelRepository {
@@ -37,9 +35,9 @@ public class AluguelRepository {
     private final JdbcTemplate jdbcTemplate;
 
     /**
-     * Mapeador para projeção resumida de aluguel (cabeçalho + nome do usuário).
+     * Mapeador para projeção de aluguel contendo o nome do usuário associado via join.
      */
-    private final RowMapper<AluguelResumoResponseDTO> aluguelResumoRowMapper = (rs, rowNum) -> new AluguelResumoResponseDTO(
+    private final RowMapper<Aluguel> aluguelComUsuarioRowMapper = (rs, rowNum) -> new Aluguel(
             rs.getString("id"),
             rs.getString("usuarios_id"),
             rs.getString("usuario_nome"),
@@ -49,7 +47,7 @@ public class AluguelRepository {
     );
 
     /**
-     * Mapeador para a entidade base Aluguel.
+     * Mapeador para a entidade base Aluguel (sem join de usuário).
      */
     private final RowMapper<Aluguel> aluguelEntityRowMapper = (rs, rowNum) -> new Aluguel(
             rs.getString("id"),
@@ -60,9 +58,9 @@ public class AluguelRepository {
     );
 
     /**
-     * Mapeador para projeção de LivroResponseDTO nos livros vinculados a um aluguel.
+     * Mapeador para projeção de Livro com nome do gênero para os livros vinculados a um aluguel.
      */
-    private final RowMapper<LivroResponseDTO> livroResponseRowMapper = (rs, rowNum) -> new LivroResponseDTO(
+    private final RowMapper<Livro> livroComGeneroRowMapper = (rs, rowNum) -> new Livro(
             rs.getString("id"),
             rs.getString("generos_id"),
             rs.getString("genero_nome"),
@@ -80,9 +78,9 @@ public class AluguelRepository {
     }
 
     /**
-     * Insere o registro principal (cabeçalho) do aluguel na tabela 'alugueis'.
+     * Insere o registro mestre de um aluguel no banco de dados.
      *
-     * @param aluguel Entidade contendo o UUID, identificador do usuário, datas e status.
+     * @param aluguel Entidade contendo cabeçalho, datas e identificadores.
      * @return Linhas afetadas.
      */
     public int insertAluguel(Aluguel aluguel) {
@@ -114,9 +112,9 @@ public class AluguelRepository {
      * prioritariamente pelos prazos mais antigos e urgentes de devolução.
      *
      * @param pageable Configuração de paginação.
-     * @return Página de AluguelResumoResponseDTO.
+     * @return Página de entidades Aluguel contendo o nome do usuário.
      */
-    public Page<AluguelResumoResponseDTO> findNaoConcluidos(Pageable pageable) {
+    public Page<Aluguel> findNaoConcluidos(Pageable pageable) {
         String countSql = "SELECT COUNT(id) FROM alugueis WHERE status IN ('ativo', 'atrasado')";
         Long total = jdbcTemplate.queryForObject(countSql, Long.class);
         long totalRegistros = total != null ? total : 0L;
@@ -129,9 +127,9 @@ public class AluguelRepository {
                         + "ORDER BY a.data_devolucao_prevista ASC, a.data_aluguel ASC "
                         + "LIMIT ? OFFSET ?";
 
-        List<AluguelResumoResponseDTO> alugueis = jdbcTemplate.query(
+        List<Aluguel> alugueis = jdbcTemplate.query(
                 querySql,
-                aluguelResumoRowMapper,
+                aluguelComUsuarioRowMapper,
                 pageable.getPageSize(),
                 pageable.getOffset()
         );
@@ -144,9 +142,9 @@ public class AluguelRepository {
      *
      * @param usuarioId Identificador UUID do leitor.
      * @param pageable Parâmetros de paginação.
-     * @return Página com o histórico do usuário.
+     * @return Página de entidades Aluguel com o histórico do usuário.
      */
-    public Page<AluguelResumoResponseDTO> findByUsuarioId(String usuarioId, Pageable pageable) {
+    public Page<Aluguel> findByUsuarioId(String usuarioId, Pageable pageable) {
         String countSql = "SELECT COUNT(id) FROM alugueis WHERE usuarios_id = ?";
         Long total = jdbcTemplate.queryForObject(countSql, Long.class, usuarioId);
         long totalRegistros = total != null ? total : 0L;
@@ -159,9 +157,9 @@ public class AluguelRepository {
                         + "ORDER BY a.data_aluguel DESC "
                         + "LIMIT ? OFFSET ?";
 
-        List<AluguelResumoResponseDTO> alugueis = jdbcTemplate.query(
+        List<Aluguel> alugueis = jdbcTemplate.query(
                 querySql,
-                aluguelResumoRowMapper,
+                aluguelComUsuarioRowMapper,
                 usuarioId,
                 pageable.getPageSize(),
                 pageable.getOffset()
@@ -171,24 +169,24 @@ public class AluguelRepository {
     }
 
     /**
-     * Busca os dados detalhados de um aluguel específico agregando a lista completa dos livros alugados.
+     * Busca os dados detalhados de um aluguel agregando o cabeçalho e a lista de livros em um AluguelCompleto.
      *
      * @param id Identificador UUID do aluguel.
-     * @return Optional contendo AluguelDetalhadoResponseDTO com cabeçalho e livros.
+     * @return Optional contendo AluguelCompleto caso encontrado.
      */
-    public Optional<AluguelDetalhadoResponseDTO> findByIdComLivros(String id) {
+    public Optional<AluguelCompleto> findCompletoById(String id) {
         String sqlCabecalho = "SELECT a.id, a.usuarios_id, u.nome AS usuario_nome, a.data_aluguel, "
                             + "a.data_devolucao_prevista, a.status "
                             + "FROM alugueis a "
                             + "INNER JOIN usuarios u ON a.usuarios_id = u.id "
                             + "WHERE a.id = ?";
 
-        List<AluguelResumoResponseDTO> cabecalhos = jdbcTemplate.query(sqlCabecalho, aluguelResumoRowMapper, id);
+        List<Aluguel> cabecalhos = jdbcTemplate.query(sqlCabecalho, aluguelComUsuarioRowMapper, id);
         if (cabecalhos.isEmpty()) {
             return Optional.empty();
         }
 
-        AluguelResumoResponseDTO cabecalho = cabecalhos.getFirst();
+        Aluguel cabecalho = cabecalhos.getFirst();
 
         String sqlLivros = "SELECT l.id, l.generos_id, g.nome AS genero_nome, l.titulo, l.autor, "
                          + "l.descricao, l.ano_publicacao, l.isbn, l.quantidade_disponivel, l.status_livro "
@@ -198,19 +196,9 @@ public class AluguelRepository {
                          + "WHERE da.alugueis_id = ? "
                          + "ORDER BY l.titulo ASC";
 
-        List<LivroResponseDTO> livros = jdbcTemplate.query(sqlLivros, livroResponseRowMapper, id);
+        List<Livro> livros = jdbcTemplate.query(sqlLivros, livroComGeneroRowMapper, id);
 
-        AluguelDetalhadoResponseDTO detalhado = new AluguelDetalhadoResponseDTO(
-                cabecalho.id(),
-                cabecalho.usuarioId(),
-                cabecalho.usuarioNome(),
-                cabecalho.dataAluguel(),
-                cabecalho.dataDevolucaoPrevista(),
-                cabecalho.status(),
-                livros
-        );
-
-        return Optional.of(detalhado);
+        return Optional.of(new AluguelCompleto(cabecalho, livros));
     }
 
     /**
@@ -226,7 +214,7 @@ public class AluguelRepository {
     }
 
     /**
-     * Recupera todos os identificadores de livros vinculados a determinado aluguel.
+     * Recupera os identificadores dos livros vinculados a um determinado aluguel.
      *
      * @param aluguelId Identificador UUID do aluguel.
      * @return Lista de IDs dos livros associados.
@@ -237,12 +225,12 @@ public class AluguelRepository {
     }
 
     /**
-     * Atualiza a data de devolução prevista e o status operacional do aluguel.
+     * Atualiza o prazo de devolução e a situação operacional de um aluguel existente.
      *
      * @param id Identificador UUID do aluguel.
-     * @param dataDevolucaoPrevista Nova data prevista.
-     * @param status Novo status operacional.
-     * @return Linhas alteradas no banco.
+     * @param dataDevolucaoPrevista Novo prazo acordado.
+     * @param status Novo status do aluguel.
+     * @return Linhas alteradas no MySQL.
      */
     public int updateAluguel(String id, LocalDate dataDevolucaoPrevista, StatusAluguel status) {
         String sql = "UPDATE alugueis SET data_devolucao_prevista = ?, status = ? WHERE id = ?";

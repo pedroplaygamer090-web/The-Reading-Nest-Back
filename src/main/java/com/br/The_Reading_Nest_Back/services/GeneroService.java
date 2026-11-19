@@ -1,7 +1,6 @@
 package com.br.The_Reading_Nest_Back.services;
 
 import com.br.The_Reading_Nest_Back.dtos.GeneroRequestDTO;
-import com.br.The_Reading_Nest_Back.dtos.GeneroResponseDTO;
 import com.br.The_Reading_Nest_Back.entities.Genero;
 import com.br.The_Reading_Nest_Back.exceptions.CustomException;
 import com.br.The_Reading_Nest_Back.mappers.GeneroMapper;
@@ -18,12 +17,12 @@ import java.util.UUID;
  * Explicação simples:
  * O cérebro das regras para gêneros literários. Ele cuida para que nenhum gênero com nome repetido
  * seja cadastrado, gera um código único (UUID) para cada categoria nova, busca categorias de forma
- * organizada e garante que alterações ou exclusões só ocorram se o gênero realmente existir.
+ * organizada e garante que alterações ou exclusões só ocorram se o gênero realmente existir, retornando entidades Genero.
  *
  * Explicação técnica:
  * Camada de serviço anotada com @Service que encapsula a lógica de negócio do domínio 'Genero'.
  * Coordena a validação de unicidade de chave de negócio ('nome'), a geração de UUIDs versão 4
- * antes da inserção física no MySQL, o controle transacional com @Transactional e o mapeamento DTO-Entidade.
+ * antes da inserção física no MySQL, o controle transacional com @Transactional e devolve entidades puras Genero.
  */
 @Service
 public class GeneroService {
@@ -40,10 +39,10 @@ public class GeneroService {
      * Cadastra um novo gênero literário após validar a ausência de nomes duplicados.
      *
      * @param dto Dados validados contendo o nome pretendido para a categoria.
-     * @return DTO com os dados do gênero recém-criado e seu novo UUID.
+     * @return Entidade Genero recém-criada com seu novo UUID.
      */
     @Transactional
-    public GeneroResponseDTO criar(GeneroRequestDTO dto) {
+    public Genero criar(GeneroRequestDTO dto) {
         if (generoRepository.existsByNome(dto.nome().trim())) {
             throw new CustomException(HttpStatus.CONFLICT, "JÁ EXISTE UM GÊNERO COM ESTE NOME");
         }
@@ -52,16 +51,16 @@ public class GeneroService {
         Genero genero = generoMapper.toEntity(id, dto);
         generoRepository.insert(genero);
 
-        return generoMapper.toResponseDTO(genero);
+        return genero;
     }
 
     /**
      * Recupera a listagem paginada de todos os gêneros literários em ordem alfabética.
      *
      * @param pageable Configurações de número da página e tamanho.
-     * @return Página de GeneroResponseDTO.
+     * @return Página de entidades Genero.
      */
-    public Page<GeneroResponseDTO> listar(Pageable pageable) {
+    public Page<Genero> listar(Pageable pageable) {
         return generoRepository.findAll(pageable);
     }
 
@@ -69,11 +68,10 @@ public class GeneroService {
      * Busca um gênero literário pelo seu identificador UUID universal.
      *
      * @param id Identificador UUID da categoria.
-     * @return DTO de resposta do gênero encontrado.
+     * @return Entidade Genero localizada.
      */
-    public GeneroResponseDTO buscarPorId(String id) {
+    public Genero buscarPorId(String id) {
         return generoRepository.findById(id)
-                .map(generoMapper::toResponseDTO)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "GÊNERO NÃO ENCONTRADO"));
     }
 
@@ -82,10 +80,10 @@ public class GeneroService {
      *
      * @param id Identificador UUID do gênero a ser editado.
      * @param dto Novos dados para o gênero.
-     * @return DTO do gênero com os dados atualizados.
+     * @return Entidade Genero com os dados atualizados.
      */
     @Transactional
-    public GeneroResponseDTO atualizar(String id, GeneroRequestDTO dto) {
+    public Genero atualizar(String id, GeneroRequestDTO dto) {
         if (generoRepository.findById(id).isEmpty()) {
             throw new CustomException(HttpStatus.NOT_FOUND, "GÊNERO NÃO ENCONTRADO");
         }
@@ -97,7 +95,7 @@ public class GeneroService {
         Genero genero = generoMapper.toEntity(id, dto);
         generoRepository.update(genero);
 
-        return generoMapper.toResponseDTO(genero);
+        return genero;
     }
 
     /**
@@ -109,6 +107,10 @@ public class GeneroService {
     public void excluir(String id) {
         if (generoRepository.findById(id).isEmpty()) {
             throw new CustomException(HttpStatus.NOT_FOUND, "GÊNERO NÃO ENCONTRADO");
+        }
+
+        if (generoRepository.hasLivrosVinculados(id)) {
+            throw new CustomException(HttpStatus.CONFLICT, "NÃO É POSSÍVEL EXCLUIR UM GÊNERO QUE POSSUI LIVROS VINCULADOS");
         }
 
         generoRepository.deleteById(id);

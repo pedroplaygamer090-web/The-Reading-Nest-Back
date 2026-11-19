@@ -3,15 +3,17 @@ package com.br.The_Reading_Nest_Back.entities;
 /**
  * Explicação simples:
  * Representa um livro físico pertencente ao acervo da biblioteca, guardando dados como título,
- * autor, sinopse, ano, código ISBN, quantidade em estoque para empréstimo e se está ativo no catálogo.
+ * autor, sinopse, ano, código ISBN, quantidade em estoque para empréstimo, a situação no catálogo
+ * e o nome da categoria literária vinculada.
  *
  * Explicação técnica:
- * Registro imutável (Java record) que mapeia diretamente as colunas da tabela 'livros' no MySQL.
- * Não utiliza anotações de ORM (como JPA/Hibernate), sendo hidratado manualmente por RowMappers
- * em conjunto com o Spring JdbcTemplate para garantir máxima performance e previsibilidade nas queries.
+ * Registro imutável (Java record) que mapeia a tabela 'livros' no MySQL e transporta a projeção
+ * opcional 'generoNome' obtida através de INNER JOIN com a tabela 'generos'. Possui construtor de
+ * conveniência para criação a partir de dados brutos da tabela sem junção.
  *
  * @param id Identificador único universal (UUID v4) do livro.
  * @param generosId Chave estrangeira referenciando o id da tabela 'generos'.
+ * @param generoNome Nome textual da categoria literária vinculada (opcional/carregado via join).
  * @param titulo Nome do livro cadastrado no sistema.
  * @param autor Nome do escritor ou escritora da obra.
  * @param descricao Resumo ou sinopse da obra literária (pode ser nulo).
@@ -23,6 +25,7 @@ package com.br.The_Reading_Nest_Back.entities;
 public record Livro(
         String id,
         String generosId,
+        String generoNome,
         String titulo,
         String autor,
         String descricao,
@@ -31,4 +34,20 @@ public record Livro(
         Integer quantidadeDisponivel,
         StatusLivro statusLivro
 ) {
+    /**
+     * Construtor de conveniência sem o nome textual do gênero (definindo-o como nulo).
+     */
+    public Livro(
+            String id,
+            String generosId,
+            String titulo,
+            String autor,
+            String descricao,
+            Integer anoPublicacao,
+            String isbn,
+            Integer quantidadeDisponivel,
+            StatusLivro statusLivro
+    ) {
+        this(id, generosId, null, titulo, autor, descricao, anoPublicacao, isbn, quantidadeDisponivel, statusLivro);
+    }
 }

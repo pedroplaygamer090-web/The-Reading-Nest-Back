@@ -1,6 +1,5 @@
 package com.br.The_Reading_Nest_Back.repositories;
 
-import com.br.The_Reading_Nest_Back.dtos.LivroResponseDTO;
 import com.br.The_Reading_Nest_Back.entities.Livro;
 import com.br.The_Reading_Nest_Back.entities.StatusLivro;
 import org.springframework.data.domain.Page;
@@ -18,13 +17,13 @@ import java.util.Optional;
  * Explicação simples:
  * Gerencia a comunicação direta com a tabela de livros no banco de dados. É aqui que os livros
  * são salvos, buscados (com filtros por categoria e status), atualizados, desativados e onde o estoque
- * de exemplares disponíveis é controlado com total segurança para não ficar negativo.
+ * de exemplares disponíveis é controlado com total segurança para não ficar negativo, retornando sempre entidades Livro.
  *
  * Explicação técnica:
  * Repositório baseado em JdbcTemplate que interage com a tabela 'livros' e realiza junções (INNER JOIN)
  * com a tabela 'generos'. Emprega consultas dinâmicas parametrizadas com filtros opcionais, listagem
- * explícita de cada coluna para evitar o antipattern SELECT *, projeção via RowMapper e comandos de atualização
- * atômicos condicionais no banco de dados (atomic conditional UPDATE) para evitar condições de corrida (race conditions).
+ * explícita de cada coluna para evitar o antipattern SELECT *, projeção via RowMapper para a entidade pura Livro
+ * e comandos de atualização atômicos condicionais no banco de dados para evitar condições de corrida (race conditions).
  */
 @Repository
 public class LivroRepository {
@@ -32,7 +31,7 @@ public class LivroRepository {
     private final JdbcTemplate jdbcTemplate;
 
     /**
-     * Mapeia as colunas da tabela 'livros' diretamente para o record de entidade pura 'Livro'.
+     * Mapeia as colunas da tabela 'livros' diretamente para a entidade pura 'Livro' (sem junção de gênero).
      */
     private final RowMapper<Livro> livroEntityRowMapper = (rs, rowNum) -> new Livro(
             rs.getString("id"),
@@ -47,9 +46,9 @@ public class LivroRepository {
     );
 
     /**
-     * Mapeia a junção entre 'livros' e 'generos' projetando diretamente em 'LivroResponseDTO'.
+     * Mapeia a junção entre 'livros' e 'generos' projetando na entidade 'Livro' com o nome da categoria preenchido.
      */
-    private final RowMapper<LivroResponseDTO> livroResponseRowMapper = (rs, rowNum) -> new LivroResponseDTO(
+    private final RowMapper<Livro> livroComGeneroRowMapper = (rs, rowNum) -> new Livro(
             rs.getString("id"),
             rs.getString("generos_id"),
             rs.getString("genero_nome"),
@@ -95,9 +94,9 @@ public class LivroRepository {
      * @param status Filtro opcional por status ('ativo' ou 'desativado').
      * @param generoId Filtro opcional por identificador de categoria/gênero literário.
      * @param pageable Parâmetros de paginação e ordenação do Spring Data.
-     * @return Página de LivroResponseDTO com totalizador e lista dos registros da janela atual.
+     * @return Página de Livro com totalizador e lista dos registros da janela atual.
      */
-    public Page<LivroResponseDTO> findAll(StatusLivro status, String generoId, Pageable pageable) {
+    public Page<Livro> findAll(StatusLivro status, String generoId, Pageable pageable) {
         StringBuilder whereSql = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
@@ -128,9 +127,9 @@ public class LivroRepository {
         queryParams.add(pageable.getPageSize());
         queryParams.add(pageable.getOffset());
 
-        List<LivroResponseDTO> livros = jdbcTemplate.query(
+        List<Livro> livros = jdbcTemplate.query(
                 querySql,
-                livroResponseRowMapper,
+                livroComGeneroRowMapper,
                 queryParams.toArray()
         );
 
@@ -141,15 +140,15 @@ public class LivroRepository {
      * Busca um livro pelo seu ID trazendo também o nome legível de seu gênero associado.
      *
      * @param id Identificador UUID do livro.
-     * @return Optional com LivroResponseDTO caso encontrado.
+     * @return Optional com a entidade Livro caso encontrada.
      */
-    public Optional<LivroResponseDTO> findById(String id) {
+    public Optional<Livro> findById(String id) {
         String sql = "SELECT l.id, l.generos_id, g.nome AS genero_nome, l.titulo, l.autor, "
                    + "l.descricao, l.ano_publicacao, l.isbn, l.quantidade_disponivel, l.status_livro "
                    + "FROM livros l "
                    + "INNER JOIN generos g ON l.generos_id = g.id "
                    + "WHERE l.id = ?";
-        List<LivroResponseDTO> resultado = jdbcTemplate.query(sql, livroResponseRowMapper, id);
+        List<Livro> resultado = jdbcTemplate.query(sql, livroComGeneroRowMapper, id);
         return resultado.stream().findFirst();
     }
 
@@ -182,11 +181,11 @@ public class LivroRepository {
     }
 
     /**
-     * Checa se o código ISBN já pertence a algum outro livro diferente do ID especificado.
+     * Checa se determinado código ISBN já pertence a outro livro (para updates).
      *
-     * @param isbn Código ISBN.
-     * @param id Identificador do livro em edição.
-     * @return Verdadeiro se houver conflito de duplicidade com outro livro.
+     * @param isbn Código ISBN pretendido.
+     * @param id Identificador UUID do livro em edição.
+     * @return Verdadeiro se colidir com outro livro.
      */
     public boolean existsByIsbnAndIdNot(String isbn, String id) {
         if (isbn == null || isbn.isBlank()) {
@@ -198,10 +197,10 @@ public class LivroRepository {
     }
 
     /**
-     * Atualiza os dados completos de um livro cadastrado.
+     * Atualiza os dados de um livro existente.
      *
-     * @param livro Entidade com as novas informações a serem persistidas.
-     * @return Linhas alteradas no banco.
+     * @param livro Entidade com dados modificados.
+     * @return Quantidade de linhas alteradas.
      */
     public int update(Livro livro) {
         String sql = "UPDATE livros SET generos_id = ?, titulo = ?, autor = ?, descricao = ?, "
@@ -222,27 +221,21 @@ public class LivroRepository {
     }
 
     /**
-     * Atualiza apenas a situação cadastral do livro (utilizado para soft-delete).
+     * Realiza soft-delete atualizando o status do livro para 'desativado'.
      *
      * @param id Identificador UUID do livro.
-     * @param status Novo status do livro ('ativo' ou 'desativado').
-     * @return Linhas afetadas no banco de dados.
+     * @return Linhas alteradas no MySQL.
      */
-    public int updateStatus(String id, StatusLivro status) {
+    public int softDelete(String id) {
         String sql = "UPDATE livros SET status_livro = ? WHERE id = ?";
-        return jdbcTemplate.update(sql, status.name(), id);
+        return jdbcTemplate.update(sql, StatusLivro.desativado.name(), id);
     }
 
     /**
-     * Decrementa atômica e condicionalmente 1 exemplar do estoque físico disponível do livro.
-     *
-     * Explicação técnica:
-     * Ao adicionar a cláusula 'AND quantidade_disponivel > 0', o banco de dados assegura em nível
-     * de linha (row lock) que duas requisições concorrentes não tornem o estoque negativo (-1),
-     * retornando 1 se a unidade foi reservada com sucesso ou 0 caso não haja mais estoque.
+     * Decrementa atômica e condicionalmente 1 unidade do estoque disponível se quantidade_disponivel > 0.
      *
      * @param id Identificador UUID do livro.
-     * @return Quantidade de linhas afetadas: 1 se decrementado com sucesso, 0 se esgotado.
+     * @return 1 se o decremento foi bem-sucedido; 0 se o estoque estava zerado (evita estoque negativo).
      */
     public int decrementarEstoque(String id) {
         String sql = "UPDATE livros SET quantidade_disponivel = quantidade_disponivel - 1 "
@@ -251,7 +244,7 @@ public class LivroRepository {
     }
 
     /**
-     * Incrementa em 1 unidade o estoque físico disponível do livro ao ocorrer uma devolução ou cancelamento.
+     * Incrementa atomicamente 1 unidade no estoque disponível ao registrar a devolução física de um livro.
      *
      * @param id Identificador UUID do livro devolvido.
      * @return Quantidade de linhas afetadas.
@@ -259,5 +252,19 @@ public class LivroRepository {
     public int incrementarEstoque(String id) {
         String sql = "UPDATE livros SET quantidade_disponivel = quantidade_disponivel + 1 WHERE id = ?";
         return jdbcTemplate.update(sql, id);
+    }
+
+    /**
+     * Verifica se determinado livro está atrelado a algum aluguel com status não concluído ('ativo' ou 'atrasado').
+     *
+     * @param livroId Identificador UUID do livro.
+     * @return Verdadeiro se houver aluguel pendente de devolução para este livro.
+     */
+    public boolean hasAlugueisAtivos(String livroId) {
+        String sql = "SELECT COUNT(da.id) FROM detalhes_alugueis da "
+                   + "INNER JOIN alugueis a ON da.alugueis_id = a.id "
+                   + "WHERE da.livros_id = ? AND a.status IN ('ativo', 'atrasado')";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, livroId);
+        return count != null && count > 0;
     }
 }

@@ -6,25 +6,19 @@ import com.br.The_Reading_Nest_Back.entities.StatusConta;
 import com.br.The_Reading_Nest_Back.entities.StatusLivro;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.format.FormatterRegistry;
-import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-import java.util.List;
 
 /**
  * Explicação simples:
- * Ajusta as configurações gerais de navegação da biblioteca: garante que qualquer busca retorne
- * por padrão 30 itens por página (com limite máximo de 100) e ensina o sistema a entender filtros
+ * Ajusta as configurações gerais de navegação da biblioteca: ensina o sistema a entender filtros
  * e valores tanto em maiúsculas quanto em minúsculas (por exemplo, aceitando tanto 'admin' quanto 'ADMIN').
+ * A paginação padrão (30 itens, máx 100) é configurada de forma declarativa no application.properties.
  *
  * Explicação técnica:
- * Configuração MVC que customiza os resolvedores de argumentos e formatadores do Spring MVC.
+ * Configuração MVC que customiza os formatadores do Spring MVC através de WebMvcConfigurer.
  * Adiciona conversores case-insensitive para os enumeradores de domínio (StatusLivro, StatusConta, StatusAluguel e PerfilUsuario),
- * normalizando a entrada com trim().toLowerCase() antes de chamar o valueOf(), e registra o
- * PageableHandlerMethodArgumentResolver com página padrão de 30 itens e teto máximo de 100 itens.
+ * normalizando a entrada com trim().toLowerCase() antes de chamar o valueOf().
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
@@ -74,13 +68,5 @@ public class WebConfig implements WebMvcConfigurer {
                 return PerfilUsuario.valueOf(source.trim().toLowerCase());
             }
         });
-    }
-
-    @Override
-    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
-        PageableHandlerMethodArgumentResolver pageableResolver = new PageableHandlerMethodArgumentResolver();
-        pageableResolver.setFallbackPageable(PageRequest.of(0, 30));
-        pageableResolver.setMaxPageSize(100);
-        resolvers.add(pageableResolver);
     }
 }
