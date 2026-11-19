@@ -241,4 +241,20 @@ public class AluguelRepository {
                 id
         );
     }
+
+    /**
+     * Atualiza um aluguel somente enquanto ele ainda não estiver concluído.
+     * O resultado indica se o estado mudou e permite controle único da reposição de estoque.
+     */
+    public int updateAluguelCondicional(String id, LocalDate dataDevolucaoPrevista, StatusAluguel status) {
+        String sql = "UPDATE alugueis SET data_devolucao_prevista = ?, status = ? "
+                   + "WHERE id = ? AND status <> 'concluido'";
+        return jdbcTemplate.update(
+                sql,
+                java.sql.Date.valueOf(dataDevolucaoPrevista),
+                status.name(),
+                id
+        );
+    }
+
 }

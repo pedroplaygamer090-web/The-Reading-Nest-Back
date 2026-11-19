@@ -26,7 +26,6 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class AuthService {
-
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -71,4 +70,5 @@ public class AuthService {
         // 5. Retorna a resposta contendo o token e os dados públicos do usuário
         return new LoginResponseDTO("Bearer", token, usuarioMapper.toResponseDTO(usuario));
     }
+
 }

@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS alugueis (
     usuarios_id VARCHAR(36) NOT NULL,
     data_aluguel TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     data_devolucao_prevista DATE NOT NULL,
-    status ENUM('ativo', 'concluido', 'atrasado') NOT NULL DEFAULT 'ativo',
+    status ENUM('ativo', 'concluido', 'atrasado' ) NOT NULL DEFAULT 'ativo',
     CONSTRAINT pk_alugueis PRIMARY KEY (id),
     CONSTRAINT fk_alugueis_usuarios FOREIGN KEY (usuarios_id) REFERENCES usuarios (id),
     INDEX idx_alugueis_status_devolucao (status, data_devolucao_prevista)

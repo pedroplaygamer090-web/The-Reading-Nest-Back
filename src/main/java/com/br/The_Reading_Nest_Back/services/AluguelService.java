@@ -230,7 +230,14 @@ public class AluguelService {
             throw new CustomException(HttpStatus.BAD_REQUEST, "ESTE ALUGUEL JÁ FOI CONCLUÍDO ANTERIORMENTE");
         }
 
-        aluguelRepository.updateAluguel(id, aluguel.dataDevolucaoPrevista(), StatusAluguel.concluido);
+        int atualizado = aluguelRepository.updateAluguelCondicional(
+                id,
+                aluguel.dataDevolucaoPrevista(),
+                StatusAluguel.concluido
+        );
+        if (atualizado == 0) {
+            throw new CustomException(HttpStatus.BAD_REQUEST, "ESTE ALUGUEL FOI ALTERADO OU CONCLUÍDO ANTERIORMENTE");
+        }
 
         List<String> livrosIds = aluguelRepository.findLivrosIdsByAluguelId(id);
         for (String livroId : livrosIds) {
@@ -263,7 +270,14 @@ public class AluguelService {
             throw new CustomException(HttpStatus.BAD_REQUEST, "ALUGUEL JÁ CONCLUÍDO NÃO PODE SER CANCELADO");
         }
 
-        aluguelRepository.updateAluguel(id, aluguel.dataDevolucaoPrevista(), StatusAluguel.concluido);
+        int atualizado = aluguelRepository.updateAluguelCondicional(
+                id,
+                aluguel.dataDevolucaoPrevista(),
+                StatusAluguel.concluido
+        );
+        if (atualizado == 0) {
+            throw new CustomException(HttpStatus.BAD_REQUEST, "ESTE ALUGUEL FOI ALTERADO OU CONCLUÍDO ANTERIORMENTE");
+        }
 
         List<String> livrosIds = aluguelRepository.findLivrosIdsByAluguelId(id);
         for (String livroId : livrosIds) {
@@ -278,4 +292,5 @@ public class AluguelService {
 
         return buscarDetalhado(id);
     }
+
 }
