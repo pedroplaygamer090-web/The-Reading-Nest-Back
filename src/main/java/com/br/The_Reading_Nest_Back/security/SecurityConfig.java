@@ -97,6 +97,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/usuarios/*").authenticated()
 
                         .requestMatchers(HttpMethod.POST, "/alugueis").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/alugueis/meus").authenticated()
                         .requestMatchers(HttpMethod.GET, "/alugueis/*").authenticated()
                         .requestMatchers(HttpMethod.POST, "/alugueis/*/devolver").authenticated()
                         .requestMatchers(HttpMethod.POST, "/alugueis/*/cancelar").authenticated()

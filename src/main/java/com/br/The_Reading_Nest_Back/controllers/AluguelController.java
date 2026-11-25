@@ -65,6 +65,18 @@ public class AluguelController {
     }
 
     /**
+     * Lista o histórico de aluguéis do usuário autenticado, incluindo os já concluídos.
+     *
+     * @param pageable Configuração de paginação.
+     * @return HTTP 200 OK com a página de resumos dos aluguéis do usuário.
+     */
+    @GetMapping("/meus")
+    public ResponseEntity<Page<AluguelResumoResponseDTO>> listarMeus(Pageable pageable) {
+        Page<Aluguel> pagina = aluguelService.listarMeus(pageable);
+        return ResponseEntity.ok(pagina.map(aluguelMapper::toResumoDTO));
+    }
+
+    /**
      * Consulta os dados detalhados de um aluguel específico trazendo a lista completa de livros.
      *
      * @param id Identificador UUID do aluguel.

@@ -102,7 +102,7 @@ Atualize a camada de segurança e os serviços para que cada rota respeite o per
     - Regras exatas de autorização:
         - **Públicas (`permitAll()`):** `OPTIONS /**`, `POST /auth/login`, `POST /usuarios`, `GET /generos`, `GET /generos/{id}`, `GET /livros`, `GET /livros/{id}`.
         - **Exclusivas de Administrador (`hasRole("ADMIN")`):** `POST /generos`, `PUT /generos/{id}`, `DELETE /generos/{id}`, `POST /livros`, `PUT /livros/{id}`, `DELETE /livros/{id}`, `GET /usuarios`, `DELETE /usuarios/{id}`, `GET /alugueis`, `PUT /alugueis/{id}`.
-        - **Autenticadas (`authenticated()`):** `GET /usuarios/{id}`, `GET /usuarios/{id}/alugueis`, `PUT /usuarios/{id}`, `POST /alugueis`, `GET /alugueis/{id}`, `POST /alugueis/{id}/devolver`, `POST /alugueis/{id}/cancelar`.
+        - **Autenticadas (`authenticated()`):** `GET /usuarios/{id}`, `GET /usuarios/{id}/alugueis`, `PUT /usuarios/{id}`, `POST /alugueis`, `GET /alugueis/meus`, `GET /alugueis/{id}`, `POST /alugueis/{id}/devolver`, `POST /alugueis/{id}/cancelar`.
 - **Validação de Dono nos Services (`UsuarioService` e `AluguelService`)** *(ATUALIZAR)*:
     - Crie um método auxiliar de segurança (ex: `SecurityUtils` no pacote `security`) para recuperar o `Usuario` autenticado do `SecurityContextHolder`.
     - Se o usuário autenticado tiver `perfil == PerfilUsuario.cliente`:

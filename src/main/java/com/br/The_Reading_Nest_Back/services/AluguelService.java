@@ -161,6 +161,17 @@ public class AluguelService {
     }
 
     /**
+     * Retorna o histórico paginado do usuário autenticado, sem depender de um ID enviado pelo cliente.
+     *
+     * @param pageable Configurações de paginação.
+     * @return Página de aluguéis do usuário autenticado.
+     */
+    public Page<Aluguel> listarMeus(Pageable pageable) {
+        Usuario usuarioLogado = securityUtils.getUsuarioAutenticadoOuFalhar();
+        return listarPorUsuario(usuarioLogado.id(), pageable);
+    }
+
+    /**
      * Busca os dados agregados de um aluguel contendo a lista completa de livros, validando posse.
      *
      * @param id Identificador UUID do aluguel.

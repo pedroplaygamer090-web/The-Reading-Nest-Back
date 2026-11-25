@@ -152,6 +152,7 @@ O backend está organizado em 9 pacotes modulares no namespace `com.br.The_Readi
 | **GET** | `/usuarios` | **Apenas Admin** | Nenhum (Parâmetros: `page`, `size`) | `200 OK` + `Page<UsuarioResponseDTO>` |
 | **GET** | `/usuarios/{id}` | Autenticado *(Dono ou Admin)* | Nenhum | `200 OK` + `UsuarioResponseDTO` |
 | **GET** | `/usuarios/{id}/alugueis` | Autenticado *(Dono ou Admin)* | Nenhum (Parâmetros: `page`, `size`) | `200 OK` + `Page<AluguelResumoResponseDTO>` |
+| **GET** | `/alugueis/meus` | Autenticado | Nenhum (Parâmetros: `page`, `size`) | `200 OK` + `Page<AluguelResumoResponseDTO>` |
 | **PUT** | `/usuarios/{id}` | Autenticado *(Dono ou Admin)* | `UsuarioUpdateDTO` (`nome`, `email`, `senha?`, `perfil?`, `statusConta?`) | `200 OK` + `UsuarioResponseDTO` |
 | **DELETE** | `/usuarios/{id}` | **Apenas Admin** | Nenhum | `204 No Content` |
 | **GET** | `/generos` | Público | Nenhum (Parâmetros: `page`, `size`) | `200 OK` + `Page<GeneroResponseDTO>` |
