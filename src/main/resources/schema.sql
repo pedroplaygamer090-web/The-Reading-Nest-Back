@@ -90,3 +90,5 @@ INSERT IGNORE INTO `detalhes_alugueis` (`id`, `alugueis_id`, `livros_id`) VALUES
 ('6582e83e-59e1-4c8d-9c79-aeeb9dfa4027', '7fd0f86d-037d-4e3a-9927-c8e0338b4be7', 'b1d2e3f4-0007-4000-8000-000000000007'),
 ('7a17e82b-5bd2-47a5-9240-d033866c6f7f', 'a71891d7-1c6b-4056-9b15-1270cbdc9beb', 'b1d2e3f4-0004-4000-8000-000000000004'),
 ('d1d2e3f4-0001-4000-8000-000000000001', 'a1d2e3f4-0001-4000-8000-000000000001', 'b1d2e3f4-0001-4000-8000-000000000001');
+
+UPDATE `usuarios` SET `senha` = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', `status_conta` = 'ativo' WHERE `email` IN ('admin@thereadingnest.com', 'cliente@thereadingnest.com');
