@@ -91,7 +91,8 @@ INSERT IGNORE INTO `detalhes_alugueis` (`id`, `alugueis_id`, `livros_id`) VALUES
 ('7a17e82b-5bd2-47a5-9240-d033866c6f7f', 'a71891d7-1c6b-4056-9b15-1270cbdc9beb', 'b1d2e3f4-0004-4000-8000-000000000004'),
 ('d1d2e3f4-0001-4000-8000-000000000001', 'a1d2e3f4-0001-4000-8000-000000000001', 'b1d2e3f4-0001-4000-8000-000000000001');
 
-UPDATE `usuarios` SET `perfil` = 'admin' WHERE `email` = 'admin@grupo.com';
+UPDATE `usuarios` SET `perfil` = 'admin' WHERE `email` = 'admin.final@thereadingnest.com';
+
 
 
 
