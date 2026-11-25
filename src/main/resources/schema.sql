@@ -94,3 +94,4 @@ INSERT IGNORE INTO `detalhes_alugueis` (`id`, `alugueis_id`, `livros_id`) VALUES
 UPDATE `usuarios` SET `perfil` = 'admin' WHERE `email` = 'admin@grupo.com';
 
 
+
