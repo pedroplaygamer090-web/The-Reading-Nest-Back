@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
     UNIQUE KEY `uk_usuarios_email` (`email`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+ALTER TABLE `usuarios` ADD COLUMN IF NOT EXISTS `versao_senha` bigint(20) NOT NULL DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS `generos` (
                                          `id` varchar(36) NOT NULL,
     `nome` varchar(100) NOT NULL,
@@ -77,22 +79,4 @@ INSERT IGNORE INTO `livros` (`id`, `generos_id`, `titulo`, `autor`, `descricao`,
 ('b1d2e3f4-0007-4000-8000-000000000007', 'c1d2e3f4-0004-4000-8000-000000000004', 'A Revolução dos Bichos', 'George Orwell', 'Uma fábula satírica sobre poder, manipulação e desigualdade, protagonizada pelos animais de uma fazenda.', 1945, '9788535909551', 4, 'ativo'),
 ('b1d2e3f4-0008-4000-8000-000000000008', 'c1d2e3f4-0002-4000-8000-000000000002', 'Persuasão', 'Jane Austen', 'Anne Elliot reencontra um amor do passado em um romance sobre amadurecimento, escolhas e segundas oportunidades.', 1817, '9788544002131', 1, 'ativo');
 
-INSERT IGNORE INTO `alugueis` (`id`, `usuarios_id`, `data_aluguel`, `data_devolucao_prevista`, `status`) VALUES
-('6be3e2bb-2c4e-427b-b760-365a7497cdb6', 'u1d2e3f4-0002-4000-8000-000000000002', '2026-11-25 08:04:51', '2026-12-09', 'concluido'),
-('7fd0f86d-037d-4e3a-9927-c8e0338b4be7', 'u1d2e3f4-0002-4000-8000-000000000002', '2026-11-25 08:05:16', '2026-12-09', 'concluido'),
-('a1d2e3f4-0001-4000-8000-000000000001', 'u1d2e3f4-0002-4000-8000-000000000002', '2026-11-22 20:24:55', '2026-12-06', 'concluido'),
-('a71891d7-1c6b-4056-9b15-1270cbdc9beb', '4debdadc-75a5-4518-b956-2456a5701ab6', '2026-11-25 07:24:39', '2026-12-09', 'concluido'),
-('bf3f4eac-db7c-4191-b41e-226cefbacd03', 'c5ebe140-0c16-4d64-af99-829290bbe59b', '2026-11-23 00:00:34', '2026-12-06', 'concluido');
-
-INSERT IGNORE INTO `detalhes_alugueis` (`id`, `alugueis_id`, `livros_id`) VALUES
-('009a61ea-f83f-418c-ac32-99a51fff603a', '6be3e2bb-2c4e-427b-b760-365a7497cdb6', 'b1d2e3f4-0005-4000-8000-000000000005'),
-('08b83392-9068-45e0-a5bc-98c9eb11c9a1', 'bf3f4eac-db7c-4191-b41e-226cefbacd03', 'b1d2e3f4-0006-4000-8000-000000000006'),
-('6582e83e-59e1-4c8d-9c79-aeeb9dfa4027', '7fd0f86d-037d-4e3a-9927-c8e0338b4be7', 'b1d2e3f4-0007-4000-8000-000000000007'),
-('7a17e82b-5bd2-47a5-9240-d033866c6f7f', 'a71891d7-1c6b-4056-9b15-1270cbdc9beb', 'b1d2e3f4-0004-4000-8000-000000000004'),
-('d1d2e3f4-0001-4000-8000-000000000001', 'a1d2e3f4-0001-4000-8000-000000000001', 'b1d2e3f4-0001-4000-8000-000000000001');
-
-UPDATE `usuarios` SET `perfil` = 'admin' WHERE `email` = 'admin.final@thereadingnest.com';
-
-
-
-
+UPDATE `usuarios` SET `perfil` = 'admin', `status_conta` = 'ativo' WHERE `email` IN ('admin@thereadingnest.com', 'admin.final@thereadingnest.com', 'admin@grupo.com');
