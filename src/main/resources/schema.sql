@@ -10,8 +10,6 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
     UNIQUE KEY `uk_usuarios_email` (`email`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE `usuarios` ADD COLUMN IF NOT EXISTS `versao_senha` bigint(20) NOT NULL DEFAULT 0;
-
 CREATE TABLE IF NOT EXISTS `generos` (
                                          `id` varchar(36) NOT NULL,
     `nome` varchar(100) NOT NULL,
@@ -79,4 +77,4 @@ INSERT IGNORE INTO `livros` (`id`, `generos_id`, `titulo`, `autor`, `descricao`,
 ('b1d2e3f4-0007-4000-8000-000000000007', 'c1d2e3f4-0004-4000-8000-000000000004', 'A Revolução dos Bichos', 'George Orwell', 'Uma fábula satírica sobre poder, manipulação e desigualdade, protagonizada pelos animais de uma fazenda.', 1945, '9788535909551', 4, 'ativo'),
 ('b1d2e3f4-0008-4000-8000-000000000008', 'c1d2e3f4-0002-4000-8000-000000000002', 'Persuasão', 'Jane Austen', 'Anne Elliot reencontra um amor do passado em um romance sobre amadurecimento, escolhas e segundas oportunidades.', 1817, '9788544002131', 1, 'ativo');
 
-UPDATE `usuarios` SET `perfil` = 'admin', `status_conta` = 'ativo' WHERE `email` IN ('admin@thereadingnest.com', 'admin.final@thereadingnest.com', 'admin@grupo.com');
+
