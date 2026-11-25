@@ -171,27 +171,62 @@ public class UsuarioRepository {
      * @return Linhas alteradas.
      */
     public int update(Usuario usuario, boolean atualizarSenha) {
+        return update(usuario, atualizarSenha, true);
+    }
+
+    /**
+     * Atualiza os dados cadastrais e controla separadamente a alteração da situação da conta.
+     *
+     * @param usuario Entidade com dados atualizados.
+     * @param atualizarSenha Se verdadeiro, inclui a nova senha com hash no comando UPDATE.
+     * @param atualizarStatusConta Se verdadeiro, inclui a situação da conta no comando UPDATE.
+     * @return Linhas alteradas.
+     */
+    public int update(Usuario usuario, boolean atualizarSenha, boolean atualizarStatusConta) {
         if (atualizarSenha) {
-            String sql = "UPDATE usuarios SET nome = ?, email = ?, senha = ?, perfil = ?, status_conta = ? WHERE id = ?";
-            return jdbcTemplate.update(
-                    sql,
-                    usuario.nome(),
-                    usuario.email(),
-                    usuario.senha(),
-                    usuario.perfil().name(),
-                    usuario.statusConta().name(),
-                    usuario.id()
-            );
+            if (atualizarStatusConta) {
+                String sql = "UPDATE usuarios SET nome = ?, email = ?, senha = ?, perfil = ?, status_conta = ? WHERE id = ?";
+                return jdbcTemplate.update(
+                        sql,
+                        usuario.nome(),
+                        usuario.email(),
+                        usuario.senha(),
+                        usuario.perfil().name(),
+                        usuario.statusConta().name(),
+                        usuario.id()
+                );
+            } else {
+                String sql = "UPDATE usuarios SET nome = ?, email = ?, senha = ?, perfil = ? WHERE id = ?";
+                return jdbcTemplate.update(
+                        sql,
+                        usuario.nome(),
+                        usuario.email(),
+                        usuario.senha(),
+                        usuario.perfil().name(),
+                        usuario.id()
+                );
+            }
         } else {
-            String sql = "UPDATE usuarios SET nome = ?, email = ?, perfil = ?, status_conta = ? WHERE id = ?";
-            return jdbcTemplate.update(
-                    sql,
-                    usuario.nome(),
-                    usuario.email(),
-                    usuario.perfil().name(),
-                    usuario.statusConta().name(),
-                    usuario.id()
-            );
+            if (atualizarStatusConta) {
+                String sql = "UPDATE usuarios SET nome = ?, email = ?, perfil = ?, status_conta = ? WHERE id = ?";
+                return jdbcTemplate.update(
+                        sql,
+                        usuario.nome(),
+                        usuario.email(),
+                        usuario.perfil().name(),
+                        usuario.statusConta().name(),
+                        usuario.id()
+                );
+            } else {
+                String sql = "UPDATE usuarios SET nome = ?, email = ?, perfil = ? WHERE id = ?";
+                return jdbcTemplate.update(
+                        sql,
+                        usuario.nome(),
+                        usuario.email(),
+                        usuario.perfil().name(),
+                        usuario.id()
+                );
+            }
         }
     }
 

@@ -148,7 +148,9 @@ public class UsuarioService {
         StatusConta statusFinal;
         if (solicitanteIsAdmin) {
             perfilFinal = dto.perfil() != null ? dto.perfil() : usuarioAtual.perfil();
-            statusFinal = dto.statusConta() != null ? dto.statusConta() : usuarioAtual.statusConta();
+            statusFinal = dto.statusConta() != null && !dto.statusConta().isBlank()
+                    ? converterStatusConta(dto.statusConta())
+                    : usuarioAtual.statusConta();
         } else {
             perfilFinal = usuarioAtual.perfil();
             statusFinal = usuarioAtual.statusConta();
@@ -163,9 +165,21 @@ public class UsuarioService {
                 statusFinal
         );
 
-        usuarioRepository.update(usuarioAtualizado, atualizarSenha);
+        usuarioRepository.update(usuarioAtualizado, atualizarSenha, solicitanteIsAdmin);
 
         return usuarioAtualizado;
+    }
+
+    private StatusConta converterStatusConta(String statusConta) {
+        return switch (statusConta.trim()) {
+            case "ativo" -> StatusConta.ativo;
+            case "suspenso" -> StatusConta.suspenso;
+            case "desativado" -> StatusConta.desativado;
+            default -> throw new CustomException(
+                    HttpStatus.BAD_REQUEST,
+                    "STATUS DA CONTA INVÁLIDO; USE ativo, suspenso ou desativado"
+            );
+        };
     }
 
     /**

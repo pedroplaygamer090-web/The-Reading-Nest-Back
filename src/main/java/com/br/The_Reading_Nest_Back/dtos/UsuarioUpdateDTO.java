@@ -1,7 +1,6 @@
 package com.br.The_Reading_Nest_Back.dtos;
 
 import com.br.The_Reading_Nest_Back.entities.PerfilUsuario;
-import com.br.The_Reading_Nest_Back.entities.StatusConta;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -38,6 +37,6 @@ public record UsuarioUpdateDTO(
 
         PerfilUsuario perfil,
 
-        StatusConta statusConta
+        String statusConta
 ) {
 }
