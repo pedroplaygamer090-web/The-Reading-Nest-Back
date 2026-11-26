@@ -55,11 +55,12 @@ CREATE TABLE IF NOT EXISTS `detalhes_alugueis` (
     CONSTRAINT `fk_detalhes_livros` FOREIGN KEY (`livros_id`) REFERENCES `livros` (`id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-DELETE FROM `usuarios` WHERE `email` IN ('admin@thereadingnest.com', 'cliente@thereadingnest.com');
+INSERT IGNORE INTO `usuarios` (`id`, `nome`, `email`, `senha`, `versao_senha`, `perfil`, `status_conta`) VALUES
+('u1d2e3f4-0001-4000-8000-000000000001', 'Administrador', 'admin@thereadingnest.com', '$2a$10$gWGaq4zWJ2GVKqTOq6UEq.rwLgkFAHNIF.RRb06x6513FzECukUH6', 0, 'admin', 'ativo'),
+('u1d2e3f4-0002-4000-8000-000000000002', 'Cliente Demonstração', 'cliente@thereadingnest.com', '$2a$10$GRqPH4BKDxpUt39jJ94Pcuq7CmDCNWOFOWS/boiwkuoMs9.JTMgjS', 0, 'cliente', 'ativo');
 
-INSERT INTO `usuarios` (`id`, `nome`, `email`, `senha`, `versao_senha`, `perfil`, `status_conta`) VALUES
-                                                                                                      ('u1d2e3f4-0001-4000-8000-000000000001', 'Administrador', 'admin@thereadingnest.com', '$2a$10$f/R2T.H5Z1tP8v6.W0xQ2O8y9Z0A1B2C3D4E5F6G7H8I9J0K1L2M3', 0, 'admin', 'ativo'),
-                                                                                                      ('u1d2e3f4-0002-4000-8000-000000000002', 'Cliente Demonstração', 'cliente@thereadingnest.com', '$2a$10$a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8s9T0u1V2w3X4y5Z6a', 0, 'cliente', 'ativo');
+UPDATE `usuarios` SET `senha` = '$2a$10$gWGaq4zWJ2GVKqTOq6UEq.rwLgkFAHNIF.RRb06x6513FzECukUH6' WHERE `email` = 'admin@thereadingnest.com';
+UPDATE `usuarios` SET `senha` = '$2a$10$GRqPH4BKDxpUt39jJ94Pcuq7CmDCNWOFOWS/boiwkuoMs9.JTMgjS' WHERE `email` = 'cliente@thereadingnest.com';
 
 INSERT IGNORE INTO `generos` (`id`, `nome`) VALUES
 ('c1d2e3f4-0001-4000-8000-000000000001', 'Clássicos'),

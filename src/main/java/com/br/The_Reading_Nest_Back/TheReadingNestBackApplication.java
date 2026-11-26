@@ -8,6 +8,11 @@ public class TheReadingNestBackApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(TheReadingNestBackApplication.class, args);
+
+		var encoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+		System.out.println("HASH ADMIN: " + encoder.encode("Admin123!"));
+		System.out.println("HASH CLIENTE: " + encoder.encode("Cliente123!"));
+
 	}
 
 }
