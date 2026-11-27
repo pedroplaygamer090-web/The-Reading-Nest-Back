@@ -3,7 +3,9 @@ package com.br.The_Reading_Nest_Back.controllers;
 import com.br.The_Reading_Nest_Back.dtos.GeneroRequestDTO;
 import com.br.The_Reading_Nest_Back.dtos.GeneroResponseDTO;
 import com.br.The_Reading_Nest_Back.entities.Genero;
+import com.br.The_Reading_Nest_Back.exceptions.CustomException;
 import com.br.The_Reading_Nest_Back.mappers.GeneroMapper;
+import com.br.The_Reading_Nest_Back.security.SecurityUtils;
 import com.br.The_Reading_Nest_Back.services.GeneroService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -31,10 +33,12 @@ public class GeneroController {
 
     private final GeneroService generoService;
     private final GeneroMapper generoMapper;
+    private final SecurityUtils securityUtils;
 
-    public GeneroController(GeneroService generoService, GeneroMapper generoMapper) {
+    public GeneroController(GeneroService generoService, GeneroMapper generoMapper, SecurityUtils securityUtils) {
         this.generoService = generoService;
         this.generoMapper = generoMapper;
+        this.securityUtils = securityUtils;
     }
 
     /**
@@ -45,6 +49,11 @@ public class GeneroController {
      */
     @PostMapping
     public ResponseEntity<GeneroResponseDTO> criar(@Valid @RequestBody GeneroRequestDTO dto) {
+if(!securityUtils.isAdmin()) {
+    throw new CustomException(HttpStatus.FORBIDDEN, "APENAS ADMINISTRADORES PODEM CRIAR GÊNEROS");
+}
+        // pega o role e se não for admin, dá
+        // erro
         Genero criado = generoService.criar(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(generoMapper.toResponseDTO(criado));
     }

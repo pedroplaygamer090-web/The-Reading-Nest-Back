@@ -26,7 +26,7 @@ Atualizar e finalizar o backend do **The Reading Nest** (Java 25 + Spring Boot 4
 ### 2. Dependência JWT (`pom.xml`), `application.properties` e `schema.sql`
 - **Dependência JWT (`pom.xml`):** Adicione a biblioteca **JJWT** (`io.jsonwebtoken:jjwt-api`, `io.jsonwebtoken:jjwt-impl` e `io.jsonwebtoken:jjwt-jackson` na versão `0.12.6`) para geração e validação de tokens JWT no Java 25.
 - **Configuração (`src/main/resources/application.properties`):** Mantenha todas as configurações atuais intactas (incluindo `spring.sql.init.mode=never`) e adicione apenas estas duas linhas ao final:
-    - `jwt.secret=${JWT_SECRET:TheReadingNestChaveSecretaSuperSeguraParaAssinaturaJWT2026!}`
+    - `jwt.secret=${JWT_SECRET}` (chave Base64 forte, obrigatória e fornecida por variável de ambiente; sem valor padrão no código).
     - `jwt.expiration=${JWT_EXPIRATION:86400000}`
 - **Arquivo `src/main/resources/schema.sql` *(NOVO)*:** Crie o script SQL oficial e idempotente (`CREATE TABLE IF NOT EXISTS`) das 5 tabelas do banco `the-reading-nest_db`:
     - `generos` (`id`, `nome`)

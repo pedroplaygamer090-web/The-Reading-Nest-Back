@@ -120,6 +120,6 @@ O `GlobalExceptionHandler` transforma falhas conhecidas em respostas com `status
 
 ## Situação da revisão
 
-Os mappers convertem entidades em DTOs e os controllers não constroem DTOs diretamente. A suíte atual passou: **7 testes, sem falhas**. A revisão também identificou pontos para melhorar: validar cada ID na lista de livros, validar a atualização de aluguel, alinhar status de cancelamento e reposição de estoque, impor unicidade do ISBN no banco e restringir a configuração de JWT/CORS para produção. Os detalhes estão em [`RELATORIO-BACKEND.md`](RELATORIO-BACKEND.md).
+Os mappers convertem entidades em DTOs e os controllers não constroem DTOs diretamente. A suíte atual passou: **7 testes, sem falhas**. A revisão também identificou pontos para melhorar: validar cada ID na lista de livros, validar a atualização de aluguel, alinhar status de cancelamento e reposição de estoque, impor unicidade do ISBN no banco, configurar `JWT_SECRET` no ambiente de publicação e restringir CORS para produção. Os detalhes estão em [`RELATORIO-BACKEND.md`](RELATORIO-BACKEND.md).
 
 Para a apresentação, é correto dizer que o projeto está organizado e tem autenticação, validações e testes, mas não afirmar que todas as regras estão totalmente cobertas: os pontos acima ainda precisam ser tratados.

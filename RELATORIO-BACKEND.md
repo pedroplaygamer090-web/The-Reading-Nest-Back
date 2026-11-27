@@ -15,7 +15,7 @@ Nem todas as validações cobrem os casos possíveis e há regras do ciclo de al
 4. As validações de tamanho de `GeneroRequestDTO.nome` (60) e `LivroRequestDTO.autor` (100) são mais restritivas que o banco (100 e 150, respectivamente). Isso pode ser intencional, mas não é um limite idêntico ao DDL.
 5. Alterar um aluguel para `concluido` por `PUT /alugueis/{id}` repõe o estoque sem a mesma atualização condicional usada na devolução/cancelamento; chamadas concorrentes podem repor o estoque mais de uma vez. Também é possível alterar o status de um aluguel concluído sem ajuste inverso de estoque.
 6. O cancelamento não tem status próprio no enum/schema: `POST /alugueis/{id}/cancelar` marca o aluguel como `concluido` e registra o motivo somente no log.
-7. `jwt.secret` tem um valor padrão fixo no código/configuração. Em qualquer ambiente compartilhado ou produção, deve ser substituído por uma chave secreta forte fornecida externamente; o valor padrão não é apropriado para produção.
+7. A configuração JWT foi ajustada para exigir `JWT_SECRET` externamente, sem chave padrão no código. Cada ambiente, incluindo o Render, ainda precisa ter uma chave forte configurada; a aplicação não inicia se ela estiver ausente.
 8. CORS aceita qualquer origem (`allowedOriginPatterns("*")`) junto com credenciais. Para produção, a origem deve ser restringida aos domínios legítimos do frontend.
 
 Esses pontos são ressalvas identificadas na revisão; não foram alteradas regras de negócio nesta atualização documental.
@@ -119,7 +119,7 @@ Os repositories usam `JdbcTemplate`, parâmetros `?`, nomes explícitos de colun
 - A aplicação usa sessões stateless e associa perfis às autoridades `ROLE_ADMIN` e `ROLE_CLIENTE`.
 - As regras HTTP são configuradas no `SecurityConfig`; a propriedade do recurso também é validada nos services.
 - `GlobalExceptionHandler` padroniza erros com `status`, `erros` e `horario`; exceções inesperadas são registradas no log.
-- A configuração contém uma chave JWT padrão fixa e CORS amplo. Configure chave externa forte e origens explícitas antes de publicar o backend.
+- `JWT_SECRET` é obrigatória e fornecida externamente, sem valor padrão no código; confirme que está configurada como segredo no Render. CORS ainda aceita qualquer origem e deve ser limitado aos domínios autorizados antes de publicar o backend.
 
 ## Testes executados
 
@@ -130,5 +130,5 @@ Os repositories usam `JdbcTemplate`, parâmetros `?`, nomes explícitos de colun
 1. Adicionar validações de elementos em `livrosIds`; validar data e campos de `AluguelUpdateDTO`; validar `statusConta` no próprio DTO.
 2. Definir o comportamento esperado de cancelamento (status cancelado ou conclusão) e centralizar a reposição de estoque em transação condicional também para a atualização administrativa.
 3. Criar restrição única para ISBN se a unicidade for requisito, alinhando service e schema.
-4. Usar `JWT_SECRET` forte e obrigatória fora do desenvolvimento; restringir CORS aos endereços autorizados.
+4. Configurar `JWT_SECRET` forte em cada ambiente de execução, incluindo Render; restringir CORS aos endereços autorizados.
 5. Aumentar a cobertura automatizada de DTOs, mappers, segurança e repositories.
