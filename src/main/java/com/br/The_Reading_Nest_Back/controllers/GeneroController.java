@@ -94,6 +94,13 @@ if(!securityUtils.isAdmin()) {
             @PathVariable String id,
             @Valid @RequestBody GeneroRequestDTO dto
     ) {
+        if (!securityUtils.isAdmin()) {
+            throw new CustomException(
+                    HttpStatus.FORBIDDEN,
+                    "APENAS ADMINISTRADORES PODEM ATUALIZAR GÊNEROS"
+            );
+        }
+
         Genero atualizado = generoService.atualizar(id, dto);
         return ResponseEntity.ok(generoMapper.toResponseDTO(atualizado));
     }
@@ -106,6 +113,13 @@ if(!securityUtils.isAdmin()) {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable String id) {
+        if (!securityUtils.isAdmin()) {
+            throw new CustomException(
+                    HttpStatus.FORBIDDEN,
+                    "APENAS ADMINISTRADORES PODEM EXCLUIR GÊNEROS"
+            );
+        }
+
         generoService.excluir(id);
         return ResponseEntity.noContent().build();
     }
